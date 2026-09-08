@@ -1,0 +1,1051 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>关卡编辑器 + 难度引擎 · 十二生肖闯关</title>
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,"PingFang SC","Microsoft YaHei",system-ui,sans-serif;background:#0a0920;color:#e2e8f0;padding:10px;min-height:100vh}
+  #app{display:flex;gap:10px;max-width:1280px;margin:0 auto}
+  .toolbar{width:172px;flex-shrink:0;background:linear-gradient(180deg,#1a1638,#0c0a24);border:2px solid #2c2448;border-radius:10px;padding:10px;display:flex;flex-direction:column;gap:6px}
+  .toolbar h3{margin:6px 0 4px;font-size:11px;color:#8d84b8;font-weight:800;letter-spacing:1px;border-bottom:1px solid #2c2448;padding-bottom:5px}
+  .tbtn{display:flex;align-items:center;gap:7px;padding:7px 9px;border:2px solid #2c2448;border-radius:6px;background:#221b40;color:#cfc9f0;font-size:12px;font-weight:700;cursor:pointer;text-align:left;font-family:inherit}
+  .tbtn:hover{background:#2e2550;border-color:#3e3366}
+  .tbtn.active{background:linear-gradient(180deg,#3a2f6e,#2a2350);border-color:#7c5cff;color:#fff;box-shadow:0 0 8px rgba(124,92,255,.35)}
+  .tbtn.danger:hover{background:#3a1212;border-color:#b91c1c;color:#fca5a5}
+  .tbtn .dot{width:13px;height:13px;border-radius:3px;border:1px solid rgba(0,0,0,.4);flex-shrink:0}
+  .canvas-col{flex:1;display:flex;flex-direction:column;gap:10px;min-width:0}
+  .headbar{display:flex;align-items:center;justify-content:space-between;background:linear-gradient(180deg,#1a1638,#0c0a24);border:2px solid #2c2448;border-radius:10px;padding:9px 12px;flex-wrap:wrap;gap:6px}
+  .headbar .title{font-size:14px;font-weight:800;color:#fbbf24;letter-spacing:1px}
+  .headbar .actions{display:flex;gap:5px;flex-wrap:wrap}
+  .btn{padding:6px 11px;border:2px solid #2c2448;border-radius:6px;background:#221b40;color:#cfc9f0;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit}
+  .btn:hover{background:#2e2550}
+  .btn.primary{background:linear-gradient(180deg,#ffd23f,#f5a623);color:#1a1530;border-color:#5e3b00}
+  .btn.success{background:linear-gradient(180deg,#3fb56b,#2a8049);color:#fff;border-color:#1d5e3a}
+  .btn.danger{background:linear-gradient(180deg,#d44058,#8a1f33);color:#fff;border-color:#5e1018}
+  .gridwrap{flex:1;background:linear-gradient(180deg,#1a1638,#0c0a24);border:2px solid #2c2448;border-radius:10px;padding:18px;display:flex;align-items:center;justify-content:center;overflow:auto}
+  #grid{position:relative;background:linear-gradient(#1c1740 1px,transparent 1px),linear-gradient(90deg,#1c1740 1px,transparent 1px),#0f0b20;background-size:50px 50px;border:2px solid #2c2448;border-radius:6px}
+  .gcell{position:absolute;width:50px;height:50px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;border:1px solid transparent;border-radius:4px;font-weight:900;color:#fff;transition:background .08s}
+  .gcell:hover{background:rgba(124,92,255,.12)}
+  .gcell.sel{box-shadow:0 0 0 3px #fbbf24 inset;background:rgba(251,191,36,.1)}
+  .gcell .ord{font-size:8px;color:rgba(255,255,255,.6);font-weight:700;line-height:1}
+  .gcell .main{font-size:14px;line-height:1.1;text-shadow:0 1px 0 #000}
+  .gcell .sub{font-size:7px;color:#cbd5e1;line-height:1}
+  .ct-start{background:linear-gradient(135deg,#7cdcff,#1d5f9c)!important;border-color:#0f3b66}
+  .ct-normal{background:linear-gradient(135deg,#5a5378,#3a3556)!important}
+  .ct-gain{background:linear-gradient(135deg,#5fe0a0,#2a8049)!important;border-color:#1d5e3a;color:#0f2417}
+  .ct-trap{background:linear-gradient(135deg,#7a2233,#3d101b)!important;border-color:#2a0a12}
+  .ct-portal{background:linear-gradient(135deg,#9b7bff,#5a32c9)!important;border-color:#2f1870}
+  .ct-chest{background:linear-gradient(135deg,#c4a0ff,#7c3aed)!important;border-color:#4c1d95}
+  .ct-mob{background:linear-gradient(135deg,#ff8fa0,#d44058)!important;border-color:#7a1f33}
+  .ct-elite{background:linear-gradient(135deg,#ffb86b,#ea580c)!important;border-color:#7a3a08;color:#2a1500}
+  .ct-boss{background:linear-gradient(135deg,#ffe8a0,#f5b942)!important;border-color:#9a6a10;color:#2a1500;box-shadow:0 0 10px rgba(245,185,66,.5)}
+  .ct-cloud{background:linear-gradient(135deg,#cdeaff,#6db9e8)!important;border-color:#3a7fb5;color:#123a55}
+  .gcell.other-layer{opacity:.35;filter:grayscale(.7);pointer-events:none}
+  .panels{width:340px;flex-shrink:0;display:flex;flex-direction:column;gap:10px;overflow-y:auto;max-height:calc(100vh - 24px)}
+  .panel{background:linear-gradient(180deg,#1a1638,#0c0a24);border:2px solid #2c2448;border-radius:10px;padding:11px}
+  .panel h3{margin:0 0 9px;font-size:12px;color:#fbbf24;font-weight:800;letter-spacing:1px;border-bottom:1px solid #2c2448;padding-bottom:7px}
+  .field{margin-bottom:8px}.field:last-child{margin-bottom:0}
+  .field label{display:block;font-size:10px;color:#8d84b8;font-weight:700;margin-bottom:3px;letter-spacing:.5px}
+  .field input,.field select{width:100%;background:#0f0b20;border:2px solid #2c2448;color:#e2e8f0;padding:6px 9px;border-radius:5px;font-size:13px;font-weight:700;font-family:inherit}
+  .field input:focus,.field select:focus{outline:none;border-color:#7c5cff}
+  .row{display:flex;gap:6px}.row .field{flex:1}
+  .statline{display:flex;justify-content:space-between;font-size:11px;padding:3px 0;border-bottom:1px dashed #2c2448}
+  .statline:last-child{border-bottom:0}
+  .statline .k{color:#8d84b8;font-weight:700}.statline .v{font-weight:900}
+  .dscore{font-size:30px;font-weight:900;color:#fbbf24;text-shadow:0 0 10px rgba(251,191,36,.4)}
+  .dstars{font-size:18px;color:#fbbf24;letter-spacing:2px}
+  .dbar{height:8px;background:#221b40;border-radius:4px;overflow:hidden;margin:5px 0}
+  .dbarfill{height:100%;background:linear-gradient(90deg,#3fb56b,#fbbf24 50%,#d44058);border-radius:4px;transition:width .3s}
+  .diag{padding:6px 8px;margin-top:5px;border-radius:5px;font-size:11px;line-height:1.5;border-left:3px solid}
+  .diag.good{background:rgba(63,181,107,.1);border-color:#3fb56b;color:#9fe0bd}
+  .diag.warn{background:rgba(251,191,36,.1);border-color:#fbbf24;color:#fde68a}
+  .diag.bad{background:rgba(212,64,88,.1);border-color:#d44058;color:#fca5a5}
+  .diag.info{background:rgba(124,92,255,.1);border-color:#7c5cff;color:#c4b5fd}
+  .pathrow{display:flex;align-items:center;gap:6px;font-size:11px;padding:3px 0;border-bottom:1px dashed rgba(124,92,255,.18)}
+  .pathrow .ok{color:#3fb56b;font-weight:900}
+  .pathrow .s{min-width:42px;color:#8d84b8}
+  .pathrow .v{font-weight:900;color:#9fe0bd}
+  .pathrow .d{color:#ffd257;font-weight:900}
+  .subscore{font-size:10px;color:#8d84b8;display:flex;justify-content:space-between;padding:2px 0;align-items:center}
+  .subscore .b{width:60px;height:5px;background:#221b40;border-radius:2px;overflow:hidden;flex:0 0 60px;margin:0 6px}
+  .subscore .b > i{display:block;height:100%;background:#7c5cff}
+  #jsonOut{width:100%;height:110px;background:#0f0b20;border:2px solid #2c2448;color:#9fe0bd;padding:7px;border-radius:5px;font-family:Consolas,monospace;font-size:10px;resize:vertical}
+  .hint{font-size:10px;color:#5b537a;line-height:1.5;padding:6px 8px;background:#0f0b20;border-radius:5px;border-left:3px solid #2c2448}
+  .hint b{color:#8d84b8}
+  .toast{position:fixed;left:50%;bottom:30px;transform:translateX(-50%);background:#221b40;border:2px solid #7c5cff;color:#fff;padding:8px 16px;border-radius:20px;font-size:12px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:50}
+  .toast.show{opacity:1}
+  @media (max-width:1100px){#app{flex-direction:column}.toolbar{width:100%}.panels{width:100%;max-height:none}}
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="toolbar">
+    <h3>模式</h3>
+    <button class="tbtn active" data-mode="path" onclick="setMode('path')"><span class="dot" style="background:#7c5cff"></span>画路径</button>
+    <button class="tbtn" data-mode="type" onclick="setMode('type')"><span class="dot" style="background:#3fb56b"></span>设类型</button>
+    <h3>当前层</h3>
+    <button class="tbtn" data-z="1" onclick="setLayer(1)"><span class="dot" style="background:#7cdcff"></span>层1</button>
+    <button class="tbtn" data-z="2" onclick="setLayer(2)"><span class="dot" style="background:#ffd257"></span>层2</button>
+    <button class="tbtn" data-z="3" onclick="setLayer(3)"><span class="dot" style="background:#ff8a5c"></span>层3</button>
+    <div class="hint" style="margin-top:4px">多层地图（如50关3层）：各层格子坐标独立、互不物理相邻，靠<b>跨层传送门</b>连接；传送门需设<b>目标层</b>+目标坐标。</div>
+    <h3>格子类型</h3>
+    <button class="tbtn" data-pt="normal" onclick="setPaint('normal')"><span class="dot" style="background:#5a5378"></span>普通格</button>
+    <button class="tbtn" data-pt="gain" onclick="setPaint('gain')"><span class="dot" style="background:#3fb56b"></span>增益格 +N</button>
+    <button class="tbtn" data-pt="trap" onclick="setPaint('trap')"><span class="dot" style="background:#7a1f33"></span>陷阱格</button>
+    <button class="tbtn" data-pt="portal" onclick="setPaint('portal')"><span class="dot" style="background:#7c5cff"></span>传送门</button>
+    <button class="tbtn" data-pt="chest" onclick="setPaint('chest')"><span class="dot" style="background:#c4a0ff"></span>宝箱</button>
+    <button class="tbtn" data-pt="mob" onclick="setPaint('mob')"><span class="dot" style="background:#d44058"></span>普通怪</button>
+    <button class="tbtn" data-pt="elite" onclick="setPaint('elite')"><span class="dot" style="background:#ea580c"></span>精英怪(隐)</button>
+    <button class="tbtn" data-pt="boss" onclick="setPaint('boss')"><span class="dot" style="background:#f5b942"></span>Boss</button>
+    <button class="tbtn" data-pt="cloud" onclick="setPaint('cloud')"><span class="dot" style="background:#8ad4ff"></span>云雾格 ☁</button>
+    <button class="tbtn" data-pt="sleep" onclick="setPaint('sleep')"><span class="dot" style="background:#a984e0"></span>沉睡格 💤</button>
+    <button class="tbtn" data-pt="clone" onclick="setPaint('clone')"><span class="dot" style="background:#63c9a6"></span>分身格 💠</button>
+    <button class="tbtn" data-pt="start" onclick="setPaint('start')"><span class="dot" style="background:#7cdcff"></span>起点</button>
+    <h3>操作</h3>
+    <button class="tbtn danger" onclick="undoLast()"><span class="dot" style="background:#d44058"></span>删除末格</button>
+    <button class="tbtn danger" onclick="deleteSel()"><span class="dot" style="background:#b91c1c"></span>删除选中格</button>
+    <button class="tbtn danger" onclick="clearAll()"><span class="dot" style="background:#5e1018"></span>清空地图</button>
+    <button class="tbtn" onclick="newLevel()"><span class="dot" style="background:#7c5cff"></span>新建关卡</button>
+    <h3>提示</h3>
+    <div class="hint"><b>画路径</b>：点击空格放置，可<b>不邻接</b>任意格（为传送门/跳跃端点）。<b>设类型</b>：选类型再点任一格。传送门格设类型后需在属性面板填<b>配对坐标</b>；陷阱格可设「-数值/-骰子/回起点」；沉睡格设收益数值（集满3个同时苏醒）；普通怪可勾「羊Boss替罪羊分身」。</div>
+  </div>
+
+  <div class="canvas-col">
+    <div class="headbar">
+      <div class="title" id="lvTitle">关卡编辑器</div>
+      <div class="actions">
+        <button class="btn" onclick="importGameFile()">📂 导入游戏本体</button>
+        <button class="btn success" onclick="writeCurrentToGame()">⬆ 写回当前关</button>
+        <button class="btn success" onclick="writeAllToGame()">⬆ 写回全部</button>
+        <label class="btn" style="cursor:pointer">📄 导入单关文件<input type="file" accept=".json,application/json" style="display:none" onchange="importJSONFile(event)"></label>
+        <button class="btn primary" onclick="exportAllFile()">导出全部关卡</button>
+      </div>
+    </div>
+    <div class="gridwrap"><div id="grid"></div></div>
+  </div>
+
+  <div class="panels">
+    <div class="panel">
+      <h3>关卡基本信息</h3>
+      <div class="row">
+        <div class="field"><label>ID</label><input id="fId" type="number" value="1" min="1" max="50" oninput="syncMeta()"></div>
+        <div class="field"><label>名称</label><input id="fName" type="text" value="新关卡" oninput="syncMeta()"></div>
+      </div>
+      <div class="row">
+        <div class="field"><label>起始数值</label><input id="fStart" type="number" value="4" min="1" oninput="syncMeta()"></div>
+        <div class="field"><label>骰子数量</label><input id="fDice" type="number" value="5" min="1" max="20" oninput="syncMeta()"></div>
+      </div>
+      <div class="row">
+        <div class="field"><label>增益数值</label><input id="fGain" type="number" value="2" min="1" oninput="syncMeta()"></div>
+        <div class="field"><label>目标难度</label><input id="fTarget" type="number" value="30" min="0" max="100" oninput="renderDifficulty()"></div>
+      </div>
+    </div>
+    <div class="panel">
+      <h3>出战装备模拟</h3>
+      <div class="field"><label>武器</label><select id="eWeapon" onchange="setEquip('w',this.value)"></select></div>
+      <div class="row">
+        <div class="field"><label>符咒槽1</label><select id="eC0" onchange="setEquip('c',0,this.value)"></select></div>
+        <div class="field"><label>符咒槽2</label><select id="eC1" onchange="setEquip('c',1,this.value)"></select></div>
+        <div class="field"><label>符咒槽3</label><select id="eC2" onchange="setEquip('c',2,this.value)"></select></div>
+      </div>
+      <div class="hint">难度/数值/行动点按此装备计算。武器：腐朽之刃(临时+50逐格-5)/贪婪镰刀(每杀+5)/掠夺者匕首(补1骰)/幸运骰(1~2重掷,前2骰)/双生骰(取双掷大者)/诅咒骰(每骰+2)。符咒：狗(战斗值×1.4)/鼠(击败+30%)/牛(首次失败掷骰救回,耗1骰)/虎(首个敌人后连杀,下个≤2倍直接斩)/马(首末骰×2≈+2骰)/羊(首次失败替罪羊救回)/鸡(沉睡格集3苏醒×2)/猪(每格概率+骰/金币)；兔/龙/蛇/猴为策略性(跳跃/铺雾/陷阱免疫/分身)。</div>
+    </div>
+    <div class="panel"><h3>格子属性</h3><div id="cellProps"><div class="hint">选中一个格子以编辑属性</div></div></div>
+    <div class="panel"><h3>地图统计</h3><div id="mapStats"></div></div>
+    <div class="panel"><h3>到达本格 · 路径分析</h3><div id="cellAnalysis"><div class="hint">选中一个格子，查看从起点沿各路径到达时的数值/行动点</div></div></div>
+    <div class="panel"><h3>难度引擎</h3><div id="diffPanel"><div class="hint">画好路径后自动计算</div></div></div>
+    <div class="panel">
+      <h3>关卡库（多关管理）</h3>
+      <div style="display:flex;gap:5px;margin-bottom:8px;flex-wrap:wrap">
+        <button class="btn success" onclick="saveToLib()" style="flex:1">存入当前</button>
+        <button class="btn danger" onclick="deleteFromLib()" style="flex:0 0 60px">删除</button>
+      </div>
+      <button class="btn" onclick="restoreSourceLevel(2)" style="width:100%;margin-bottom:8px;border-color:#3b5b9a;background:#16264a" title="用 levels/level_2.json 覆盖关卡库中的第2关">↺ 恢复第2关 = level_2.json</button>
+      <div id="libList" style="max-height:160px;overflow-y:auto;border:1px solid #2c2448;border-radius:5px"></div>
+      <div class="hint" style="margin-top:6px">点列表项=加载该关；「导出全部关卡」下载 <b>levels.json</b>（粘回游戏 LEVELS）。</div>
+    </div>
+    <div class="panel">
+      <h3>JSON 数据（当前关）</h3>
+      <textarea id="jsonOut" readonly></textarea>
+      <div style="display:flex;gap:5px;margin-top:6px">
+        <button class="btn" onclick="downloadCurrent()" style="flex:1">下载当前关</button>
+        <button class="btn success" onclick="copyJSON()" style="flex:1">复制当前</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+// ============================================================
+//  CONFIG
+// ============================================================
+const DIFFICULTY_CONFIG = {
+  // 连续胜率制难度：数值/行动点按达成度平滑打分，只有严重缺口才逼近100
+  weights:{ value:0.6, reach:0.4 },
+  comfortSlack:5,       // 数值余量 ≥ 此值 → 数值充裕
+  trapDeadEnd:0.4,      // (保留,备用)
+  slackAmp:0.35,        // 余量不足 comfortSlack 时对行动点风险的放大系数
+  starCuts:[10,25,45,70]
+};
+const GRID=9, CELL=50;
+// 层号归一:boss 格的 z 可能是"生肖立绘标识"(字符串如 "dog"/"rat"),非层号;仅数字视为层号,其余当层1
+const pz=p=>{const z=p&&p.z;return typeof z==="number"?z:1;};
+const TYPES={start:'起点',normal:'普通格',gain:'增益格',trap:'陷阱格',portal:'传送门',chest:'宝箱',mob:'普通怪',elite:'精英怪',boss:'Boss',cloud:'云雾格',sleep:'沉睡格',clone:'分身格'};
+// 权威关卡源(levels/ 目录导出的单关JSON): 编辑器以第2关=levels/level_2.json 为准
+const LEVEL_SOURCE={
+ 2: {"id":2,"name":"新手教程","startVal":5,"dice":5,"gain":2,"path":[{"c":1,"r":8,"t":"start"},{"c":1,"r":7,"t":"gain","v":2},{"c":2,"r":7,"t":"gain","v":2},{"c":3,"r":7,"t":"mob","v":5},{"c":4,"r":7,"t":"gain","v":2},{"c":4,"r":6,"t":"gain","v":3},{"c":4,"r":5,"t":"mob","v":16},{"c":4,"r":4,"t":"gain","v":2},{"c":4,"r":3,"t":"mob","v":35},{"c":4,"r":2,"t":"elite","v":70},{"c":3,"r":2,"t":"gain","v":2},{"c":2,"r":2,"t":"gain","v":2},{"c":1,"r":2,"t":"chest","rt":"dice","ra":1},{"c":1,"r":1,"t":"gain","v":2},{"c":1,"r":0,"t":"boss","v":132}],"cells":[{"c":1,"r":8,"t":"start"},{"c":1,"r":7,"t":"gain","v":2},{"c":2,"r":7,"t":"gain","v":2},{"c":3,"r":7,"t":"mob","v":5},{"c":4,"r":7,"t":"gain","v":2},{"c":5,"r":7,"t":"gain","v":2},{"c":6,"r":7,"t":"chest","rt":"value","ra":20},{"c":7,"r":7,"t":"gain","v":2},{"c":4,"r":6,"t":"gain","v":3},{"c":4,"r":5,"t":"mob","v":16},{"c":4,"r":4,"t":"gain","v":2},{"c":4,"r":3,"t":"mob","v":35},{"c":7,"r":6,"t":"gain","v":2},{"c":7,"r":5,"t":"chest","rt":"dice","ra":2},{"c":7,"r":4,"t":"gain","v":2},{"c":7,"r":3,"t":"mob","v":40},{"c":7,"r":2,"t":"gain","v":2},{"c":6,"r":2,"t":"gain","v":2},{"c":4,"r":2,"t":"elite","v":70},{"c":5,"r":2,"t":"gain","v":2},{"c":3,"r":2,"t":"gain","v":2},{"c":2,"r":2,"t":"gain","v":2},{"c":1,"r":2,"t":"chest","rt":"dice","ra":1},{"c":1,"r":1,"t":"gain","v":2},{"c":1,"r":0,"t":"boss","v":132}]}
+};
+
+// ============================================================
+//  EDITOR STATE
+// ============================================================
+let E={
+  level:{id:1,name:'新关卡',startVal:4,dice:5,gain:2,path:[]}, // path = 所有已放置格（放置序），连通性=正交邻接
+  mode:'path',
+  paint:'normal',
+  selected:null,
+  z:1, // 当前编辑层(1/2/3);多层地图各层坐标独立,靠跨层传送门连接
+  equip:{w:null,c:[null,null,null]}
+};
+const LIB_KEY='zodiac_editor_lib_v1';
+const EQUIP_KEY='zodiac_editor_equip_v1';
+let LEVELS_LIB={};
+
+// ============================================================
+//  出战装备模拟 —— 与游戏 index.html 的武器/符咒系统一致
+// ============================================================
+const EDITOR_WEAPONS={
+  blade:{name:"腐朽之刃",icon:"🗡️",desc:"临时+50,每走1格-5"},
+  scythe:{name:"贪婪镰刀",icon:"⚒️",desc:"每击败1个敌人+5数值"},
+  dagger:{name:"掠夺者匕首",icon:"🔪",desc:"有效骰子+1"},
+  lucky:{name:"幸运骰",icon:"🎲",desc:"掷出1~2可重掷(不限次数)"},
+  twin:{name:"双生骰",icon:"🎲",desc:"每骰取两个d6之大者"},
+  cursed:{name:"诅咒骰",icon:"🎲",desc:"每骰+3(忽略掷6损骰)"}
+};
+const EDITOR_CHARMS={
+  dog:{name:"狗符咒",icon:"🐕",desc:"遇敌/遇Boss时战斗值×1.4"},
+  rat:{name:"鼠符咒",icon:"🐀",desc:"击败敌人后额外获得其30%数值"},
+  ox:{name:"牛符咒",icon:"🐂",desc:"首次检定失败掷骰救回(消耗1骰)"},
+  tiger:{name:"虎符咒",icon:"🐯",desc:"击败首个敌人后进入连杀,下一个数值≤自身2倍的敌人直接斩杀(一次性)"},
+  rabbit:{name:"兔符咒",icon:"🐇",desc:"骰子可转化为一次跳跃(半径2格,用于孤立Boss)"},
+  dragon:{name:"龙符咒",icon:"🐉",desc:"每局可铺4格云雾格作路径"},
+  snake:{name:"蛇符咒",icon:"🐍",desc:"整局游戏免疫前3个陷阱格减益"},
+  horse:{name:"马符咒",icon:"🐴",desc:"本关第一个与最后一个骰子点数×2行动点(≈+2骰)"},
+  goat:{name:"羊符咒",icon:"🐐",desc:"每回合首次战斗失败时让替罪羊承担失败,吸收敌人20%数值(每局一次,对Boss无效)"},
+  monkey:{name:"猴符咒",icon:"🐵",desc:"地图某格形成分身,主角获得数值时分身同步+80%,到达分身格融合吸收"},
+  rooster:{name:"鸡符咒",icon:"🐓",desc:"沉睡格仍需集齐3个才苏醒,但苏醒收益提升至200%"},
+  pig:{name:"猪符咒",icon:"🐷",desc:"每经过一格概率获得少量骰子(14%)或金币(65%)"}
+};
+function equipLoad(){
+  try{const s=localStorage.getItem(EQUIP_KEY);if(s)E.equip=JSON.parse(s);}catch(e){}
+  if(!E.equip||!Array.isArray(E.equip.c))E.equip={w:null,c:[null,null,null]};
+  while(E.equip.c.length<3)E.equip.c.push(null);
+}
+function equipSave(){localStorage.setItem(EQUIP_KEY,JSON.stringify(E.equip));}
+function equipPopulate(){
+  const ws=document.getElementById('eWeapon');
+  if(ws){
+    let h='<option value="">无武器</option>';
+    for(const id in EDITOR_WEAPONS)h+=`<option value="${id}" ${E.equip.w===id?'selected':''}>${EDITOR_WEAPONS[id].icon} ${EDITOR_WEAPONS[id].name}</option>`;
+    ws.innerHTML=h;
+  }
+  for(let k=0;k<3;k++){
+    const sel=document.getElementById('eC'+k);
+    if(!sel)continue;
+    let h='<option value="">空</option>';
+    for(const id in EDITOR_CHARMS)h+=`<option value="${id}" ${E.equip.c[k]===id?'selected':''}>${EDITOR_CHARMS[id].icon} ${EDITOR_CHARMS[id].name}</option>`;
+    sel.innerHTML=h;
+  }
+}
+function setEquip(k,a,b){
+  if(k==='w')E.equip.w=a||null;
+  else E.equip.c[a]=b||null;
+  equipSave();renderAll();
+}
+function equipLabel(){
+  const parts=[];
+  if(E.equip.w)parts.push(EDITOR_WEAPONS[E.equip.w].icon+' '+EDITOR_WEAPONS[E.equip.w].name);
+  E.equip.c.filter(Boolean).forEach(id=>parts.push(EDITOR_CHARMS[id].icon+' '+EDITOR_CHARMS[id].name));
+  return parts.length?parts.join(' · '):'无';
+}
+
+// ============================================================
+//  工具
+// ============================================================
+function key(c,r,z){return (z||1)+','+c+','+r;}
+function cellMap(level){const m={};(level.path||[]).forEach((p,i)=>m[key(p.c,p.r,pz(p))]={cell:p,idx:i});return m;}
+function getCellAt(c,r,z){const m=cellMap(E.level);return m[key(c,r,z||E.z)];}
+function adjSimple(a,c,r){return Math.abs(a.c-c)+Math.abs(a.r-r)===1;}
+function toast(t){const e=document.getElementById('toast');e.textContent=t;e.classList.add('show');clearTimeout(e._t);e._t=setTimeout(()=>e.classList.remove('show'),1400);}
+
+// ============================================================
+//  网格
+// ============================================================
+function setupGrid(){
+  const g=document.getElementById('grid');g.style.width=GRID*CELL+'px';g.style.height=GRID*CELL+'px';
+  let html='';
+  for(let r=0;r<GRID;r++)for(let c=0;c<GRID;c++)html+=`<div class="gcell" style="left:${c*CELL}px;top:${r*CELL}px" data-c="${c}" data-r="${r}" onclick="onCell(${c},${r})"></div>`;
+  g.innerHTML=html;
+}
+function renderGrid(){
+  const m=cellMap(E.level);
+  document.querySelectorAll('.gcell').forEach(el=>{
+    const c=+el.dataset.c,r=+el.dataset.r;
+    el.className='gcell';el.innerHTML='';el.style.opacity='1';
+    const hit=m[key(c,r,E.z)];
+    if(hit){
+      const p=hit.cell;
+      el.classList.add('ct-'+p.t);
+      if(pz(p)!==E.z)el.classList.add('other-layer');
+      if(E.selected&&E.selected.c===c&&E.selected.r===r&&E.selected.z===pz(p))el.classList.add('sel');
+      let main='',sub='';
+      if(p.t==='start')main='起';
+      else if(p.t==='boss')main=p.v;
+      else if(p.t==='mob')main=p.v;
+      else if(p.t==='elite'){main=p.v;sub='隐';}
+      else if(p.t==='cloud'){main='☁';sub='云雾';}
+      else if(p.t==='sleep'){main='💤';sub=(p.rt==='dice'?'🎲':p.rt==='coin'?'💰':'+')+((p.ra!=null?p.ra:(p.v!=null?p.v:E.level.gain)));}
+      else if(p.t==='clone'){main='💠';sub='分身';}
+      else if(p.t==='gain')main=(p.v<0?p.v:'+'+(p.v??E.level.gain));
+      else if(p.t==='trap'){main='☠';sub={value:'-数值',dice:'-骰子',start:'回起点'}[p.eff]||'';}
+      else if(p.t==='portal'){main='⛩';sub=p.link?('→'+((p.link.z||1)+'层')+p.link.c+','+p.link.r):'未配对';}
+      else if(p.t==='chest')main='箱';
+      else main=hit.idx;
+      el.innerHTML=`<span class="ord">${hit.idx}</span><span class="main">${main}</span>${sub?`<span class="sub">${sub}</span>`:''}`;
+    }
+  });
+}
+
+// ============================================================
+//  交互
+// ============================================================
+function setMode(mode){E.mode=mode;document.querySelectorAll('.tbtn[data-mode]').forEach(b=>b.classList.toggle('active',b.dataset.mode===mode));renderGrid();}
+function setPaint(t){E.paint=t;setMode('type');document.querySelectorAll('.tbtn[data-pt]').forEach(b=>b.classList.toggle('active',b.dataset.pt===t));}
+function setLayer(z){E.z=z;E.selected=null;document.querySelectorAll('.tbtn[data-z]').forEach(b=>b.classList.toggle('active',+b.dataset.z===z));renderGrid();renderProps();}
+function onCell(c,r){
+  if(E.mode==='path')handlePath(c,r);else if(E.mode==='type')handleType(c,r);
+  E.selected={c,r,z:E.z};renderAll();
+}
+// 画路径：新格只需邻接任意已有格即可放（4方向，自由分叉；同一层内邻接）
+function handlePath(c,r){
+  const path=E.level.path;
+  const hit=getCellAt(c,r,E.z);
+  if(hit)return; // 已有格 → 仅选中
+  if(path.length===0){path.push({c,r,z:E.z,t:'start'});toast('起点已放置');return;}
+  // 允许放置非相邻格(传送门/跳跃端点准备);相邻与否提示但不阻止
+  const neighbor=path.some(p=>pz(p)===E.z&&adjSimple(p,c,r));
+  path.push({c,r,z:E.z,t:'normal'});
+  if(!neighbor)toast('已放置孤立格(不邻接)——可作传送门/跳跃端点/跨层目标');
+}
+function handleType(c,r){
+  const hit=getCellAt(c,r,E.z);
+  if(!hit){toast('先在「画路径」模式画格');return;}
+  const t=E.paint,p=hit.cell;
+  if(t==='start'){E.level.path.forEach(x=>{if(x.t==='start')x.t='normal';});p.t='start';}
+  else if(t==='boss'){E.level.path.forEach(x=>{if(x.t==='boss')x.t='normal';});p.t='boss';if(p.v==null)p.v=20;}
+  else{p.t=t;if(['mob','elite'].includes(t)&&p.v==null)p.v=5;if(t==='gain'&&p.v==null)p.v=E.level.gain;if(t==='coin'&&p.v==null)p.v=10;if(t==='dice'&&p.v==null)p.v=1;if(t==='chest'&&p.rt==null){p.rt='value';p.ra=3;}if(t==='trap'&&p.eff==null){p.eff='value';p.ra=5;}if(t==='portal'&&p.link==null){p.link=null;}if(t==='sleep'&&p.rt==null){p.rt='value';p.ra=E.level.gain;p.v=E.level.gain;}}
+}
+function undoLast(){if(E.level.path.length===0)return;E.level.path.pop();if(E.selected)E.selected=null;renderAll();}
+function deleteSel(){
+  if(!E.selected)return;
+  const {c,r}=E.selected;
+  E.level.path=E.level.path.filter(p=>!(p.c===c&&p.r===r&&pz(p)===E.selected.z));
+  E.selected=null;renderAll();
+}
+function clearAll(){if(!confirm('清空整张地图？'))return;E.level.path=[];E.selected=null;renderAll();}
+function setProp(k,v){const hit=getCellAt(E.selected.c,E.selected.r,E.selected.z);if(!hit)return;hit.cell[k]=v;renderAll();}
+function setSleepRT(rt){const hit=getCellAt(E.selected.c,E.selected.r,E.selected.z);if(!hit)return;const p=hit.cell;p.rt=rt;if(p.ra==null)p.ra=(rt==='dice'?1:rt==='coin'?10:E.level.gain);if(rt==='value'&&p.v==null)p.v=E.level.gain;renderAll();}
+function setLinkC(v){const hit=getCellAt(E.selected.c,E.selected.r,E.selected.z);if(!hit)return;if(!hit.cell.link)hit.cell.link={};hit.cell.link.c=v;renderAll();}
+function setLinkR(v){const hit=getCellAt(E.selected.c,E.selected.r,E.selected.z);if(!hit)return;if(!hit.cell.link)hit.cell.link={};hit.cell.link.r=v;renderAll();}
+function setLinkZ(v){const hit=getCellAt(E.selected.c,E.selected.r,E.selected.z);if(!hit)return;if(!hit.cell.link)hit.cell.link={};hit.cell.link.z=+v;renderAll();}
+
+// ============================================================
+//  属性 / 统计
+// ============================================================
+function renderProps(){
+  const box=document.getElementById('cellProps');
+  if(!E.selected){box.innerHTML='<div class="hint">选中一个格子以编辑属性</div>';return;}
+  const hit=getCellAt(E.selected.c,E.selected.r);
+  if(!hit){box.innerHTML='<div class="hint">该格无</div>';return;}
+  const p=hit.cell;
+  let html=`<div class="statline"><span class="k">位置</span><span class="v">(${p.c},${p.r}) · 第${hit.idx}格 · ${TYPES[p.t]||p.t}</span></div>`;
+  if(['mob','elite','boss'].includes(p.t)){
+    html+=`<div class="field"><label>${p.t==='elite'?'数值(游戏中隐藏)':'数值门槛'}</label><input type="number" min="1" value="${p.v??5}" oninput="setProp('v',+this.value)"></div>`;
+    if(p.t==='elite')html+='<div class="hint">精英怪数值游戏中隐藏，编辑器与难度引擎仍按此值计算。</div>';
+    if(p.t==='mob')html+=`<div class="field"><label>羊Boss替罪羊分身</label><select onchange="setProp('scapegoat',this.value==='1')"><option value="0" ${p.scapegoat?'':'selected'}>否</option><option value="1" ${p.scapegoat?'selected':''}>是(需击败3个后才能挑战羊Boss)</option></select></div>`;
+  }
+  if(p.t==='gain')html+=`<div class="field"><label>获得数值(负数=损失)</label><input type="number" value="${p.v??E.level.gain}" oninput="setProp('v',+this.value)"><div class="hint">填负数即可做「-数值」陷阱。</div></div>`;
+  if(p.t==='trap'){
+    const EFFS=[['value','-数值'],[ 'dice','-骰子'],['start','回起点']];
+    html+=`<div class="field"><label>陷阱效果</label><select onchange="setProp('eff',this.value)">${EFFS.map(([v,n])=>`<option value="${v}" ${p.eff===v?'selected':''}>${n}</option>`).join('')}</select></div>`;
+    if(p.eff!=='start')html+=`<div class="field"><label>损失数量</label><input type="number" min="1" value="${p.ra??5}" oninput="setProp('ra',+this.value)"></div>`;
+    html+='<div class="hint">踩中触发一次（-数值/-骰子，或回到起点）。</div>';
+  }
+  if(p.t==='portal'){
+    html+=`<div class="field"><label>目标层</label><select onchange="setLinkZ(this.value)"><option value="1" ${(!p.link||(p.link.z||1)===1)?'selected':''}>层1</option><option value="2" ${p.link&&p.link.z===2?'selected':''}>层2</option><option value="3" ${p.link&&p.link.z===3?'selected':''}>层3</option></select></div>`;
+    html+=`<div class="row"><div class="field"><label>配对坐标 c</label><input type="number" value="${p.link?p.link.c:''}" oninput="setLinkC(+this.value)"></div>
+      <div class="field"><label>配对坐标 r</label><input type="number" value="${p.link?p.link.r:''}" oninput="setLinkR(+this.value)"></div></div>`;
+    html+='<div class="hint">填目标传送门的层号+坐标(c,r)，踏上即传送到那里（可跨层）。留空=未配对。</div>';
+  }
+  if(p.t==='sleep'){
+    const srt=p.rt||'value';
+    const samt=p.ra!=null?p.ra:(p.v!=null?p.v:(srt==='dice'?1:srt==='coin'?10:E.level.gain));
+    html+=`<div class="field"><label>沉睡收益类型</label><select onchange="setSleepRT(this.value)">
+      <option value="value" ${srt==='value'?'selected':''}>数值</option>
+      <option value="dice" ${srt==='dice'?'selected':''}>骰子</option>
+      <option value="coin" ${srt==='coin'?'selected':''}>金币</option></select></div>`;
+    html+=`<div class="field"><label>收益数量</label><input type="number" min="1" value="${samt}" oninput="setProp('ra',+this.value)"><div class="hint">经过时不立即获得，集满3个沉睡格后同时苏醒获得各自收益（鸡Boss关需唤醒6个=2组×3；数值可为负）。</div></div>`;
+  }
+  if(p.t==='clone')html+='<div class="hint">分身格：到达后与分身融合，吸收其积累数值（猴Boss关需先融合才能挑战Boss）。</div>';
+  if(p.t==='coin')html+=`<div class="field"><label>金币数量</label><input type="number" min="1" value="${p.v??10}" oninput="setProp('v',+this.value)"></div>`;
+  if(p.t==='dice')html+=`<div class="field"><label>补充骰子数</label><input type="number" min="1" value="${p.v??1}" oninput="setProp('v',+this.value)"></div>`;
+  if(p.t==='chest'){
+    html+=`<div class="field"><label>奖励类型</label><select onchange="setProp('rt',this.value)"><option value="value" ${p.rt==='value'?'selected':''}>数值</option><option value="dice" ${p.rt==='dice'?'selected':''}>骰子</option><option value="coin" ${p.rt==='coin'?'selected':''}>金币</option><option value="debuff" ${p.rt==='debuff'?'selected':''}>诅咒(Debuff)</option></select></div>`;
+    if(p.rt==='debuff'){
+      const ra=p.ra||0;
+      const DBS=[[0,'随机'],[1,'迟缓'],[2,'虚弱'],[3,'破财'],[4,'厄运'],[5,'贪婪诅咒'],[6,'迷失'],[7,'怯战']];
+      html+=`<div class="field"><label>诅咒类型</label><select onchange="setProp('ra',+this.value)">${DBS.map(([v,n])=>`<option value="${v}" ${ra===v?'selected':''}>${n}</option>`).join('')}</select></div>`;
+    }else{
+      html+=`<div class="field"><label>奖励数量</label><input type="number" min="0" value="${p.ra??0}" oninput="setProp('ra',+this.value)"></div>`;
+    }
+    html+='<div class="hint">宝箱内容由编辑者人工设定，游戏不自动决定。诅咒宝箱 ra=1~7 对应七种诅咒、0=随机。</div>';
+  }
+  if(p.t==='normal'||p.t==='start')html+='<div class="hint">该类型无额外参数。</div>';
+  box.innerHTML=html;
+}
+function renderStats(){
+  const lv=E.level,path=lv.path;
+  const cnt={mob:0,elite:0,chest:0,gain:0,boss:0};
+  path.forEach(p=>{if(cnt[p.t]!==undefined)cnt[p.t]++;});
+  const startExists=path.some(p=>p.t==='start');
+  // 邻接图度数>2的格 = 分叉点
+  const adj=buildAdj(path);
+  let forks=0;
+  adj.forEach((ns,i)=>{if(ns.length>2)forks++;});
+  document.getElementById('mapStats').innerHTML=`
+    <div class="statline"><span class="k">总格数</span><span class="v">${path.length}</span></div>
+    <div class="statline"><span class="k">起点</span><span class="v">${startExists?'有':'无'}</span></div>
+    <div class="statline"><span class="k">Boss</span><span class="v">${cnt.boss?'有':'无'}</span></div>
+    <div class="statline"><span class="k">普通怪</span><span class="v">${cnt.mob}</span></div>
+    <div class="statline"><span class="k">精英怪</span><span class="v">${cnt.elite}</span></div>
+    <div class="statline"><span class="k">宝箱</span><span class="v">${cnt.chest}</span></div>
+    <div class="statline"><span class="k">增益格</span><span class="v">${cnt.gain}</span></div>
+    <div class="statline"><span class="k">分叉点(度>2)</span><span class="v">${forks}</span></div>
+    <div class="statline"><span class="k">起始数值</span><span class="v">${lv.startVal}</span></div>
+    <div class="statline"><span class="k">骰子数量</span><span class="v">${lv.dice}</span></div>`;
+}
+
+// ============================================================
+//  图论工具
+// ============================================================
+// 跳跃落点(与游戏兔跃一致:轴向/对角2格 + 斜前方1格 曼哈顿距离2)
+const JUMPS=[[-2,2],[-2,0],[-2,-2],[0,2],[0,-2],[2,0],[2,-2],[2,2],[-1,-1],[-1,1],[1,-1],[1,1]];
+function buildAdj(cells,opts){
+  const adj=cells.map(()=>[]);
+  const JUMP=(opts&&opts.jump); // 难度分析:断路时额外加"跳跃/搭路边",模拟兔符咒/自由跳跃/龙符咒铺云跨越断口
+  for(let i=0;i<cells.length;i++)for(let j=i+1;j<cells.length;j++){
+    // 物理相邻仅限同层(z 相同),跨层格(层1/2/3坐标独立)互不相邻
+    if(pz(cells[i])===pz(cells[j])&&adjSimple(cells[i],cells[j].c,cells[j].r)){adj[i].push(j);adj[j].push(i);}
+    else if(JUMP&&pz(cells[i])===pz(cells[j])&&JUMPS.some(([a,b])=>cells[j].c-cells[i].c===a&&cells[j].r-cells[i].r===b)){
+      adj[i].push(j);adj[j].push(i); // 跳跃/搭路边(不标记,仅作可达桥梁)
+    }
+  }
+  // 传送门配对:视为"传送边",使仅靠传送门连通的分区(如孤立Boss区/跨层)与起点连通——
+  // 校验(validateLevel)/难度/数值潜力全部认可"经传送门可达Boss"的合法地图。
+  cells.forEach((p,i)=>{
+    if(p.t==='portal'&&p.link&&p.link.c!=null&&p.link.r!=null){
+      const j=cells.findIndex(x=>x.c===p.link.c&&x.r===p.link.r&&pz(x)===(p.link.z||1));
+      if(j>=0&&j!==i&&!adj[i].includes(j)){adj[i].push(j);adj[j].push(i);}
+    }
+  });
+  return adj;
+}
+function bfsPath(cells,adj,start,boss){
+  if(start<0||boss<0)return[];
+  const prev={},seen=new Set([start]),q=[start];
+  while(q.length){const id=q.shift();if(id===boss)break;adj[id].forEach(n=>{if(!seen.has(n)){seen.add(n);prev[n]=id;q.push(n);}});}
+  if(!seen.has(boss))return[];
+  const p=[];let cur=boss;while(cur!==undefined){p.unshift(cur);if(cur===start)break;cur=prev[cur];}return p;
+}
+function getAllPathsDFS(cells,adj,start,boss){
+  const res=[],path=[],seen=new Set();
+  function dfs(id){
+    if(res.length>=50)return; // 已收集足够路径,提前剪枝防复杂图爆炸
+    if(seen.has(id))return;seen.add(id);path.push(id);
+    if(id===boss)res.push(path.slice());else adj[id].forEach(n=>dfs(n));
+    path.pop();seen.delete(id);
+  }
+  if(start>=0&&boss>=0)dfs(start);
+  return res.slice(0,50);
+}
+
+// ============================================================
+//  难度引擎 —— 独立函数
+// ============================================================
+function diceDist(n){let d=[1];for(let i=0;i<n;i++){const nd=new Array(d.length+6).fill(0);for(let s=0;s<d.length;s++)if(d[s])for(let f=1;f<=6;f++)nd[s+f]+=d[s];d=nd;}return d;}
+// 单骰面权重(按武器):cursed=每骰+2(3..8);twin=max(d6,d6);lucky=前2骰1~2重掷;否则d6
+function dieWeights(weapon,dieIndex){
+  if(weapon==="cursed")return{3:1,4:1,5:1,6:1,7:1,8:1};
+  if(weapon==="twin")return{1:1,2:3,3:5,4:7,5:9,6:11};
+  if(weapon==="lucky"&&dieIndex<2)return{1:1,2:1,3:4,4:4,5:4,6:4};
+  return{1:1,2:1,3:1,4:1,5:1,6:1};
+}
+// 到达概率:按武器骰面分布对 dice 颗骰子卷积求和
+function calcReach(weapon,dice,distance){
+  if(dice<=0)return distance<=0?1:0;
+  let ways=[1];
+  for(let i=0;i<dice;i++){
+    const one=dieWeights(weapon,i),nd=new Array(ways.length+8).fill(0);
+    for(let s=0;s<ways.length;s++)if(ways[s])for(const v in one)nd[s+(+v)]+=ways[s]*one[v];
+    ways=nd;
+  }
+  const total=ways.reduce((a,b)=>a+b,0);
+  if(!total)return distance<=0?1:0;
+  let ge=0;for(let s=distance;s<ways.length;s++)ge+=ways[s];
+  return ge/total;
+}
+function calculateReachProbability(diceCount,distance,weapon){
+  return calcReach(weapon,diceCount,distance);
+}
+// 武器下单骰最大值(判定"骰子够不够"用)
+function weaponMaxDie(weapon){return weapon==="cursed"?8:6;}
+// 沿一条路径(格子索引数组)模拟(可带装备):击败敌人吸收其数值;
+// minFree=途中各门槛(怪/精英/Boss)按战斗值的最紧余量;effDice=有效骰子(初始+宝箱补骰+匕首-牛)
+function simulatePath(cells,pathIdxs,level,equip){
+  const eq=equip||{w:null,c:[]};
+  const hasC=id=>eq.c&&eq.c.includes(id);
+  let v=level.startVal,temp=0,blocked=false,reason='',minFree=Infinity,dice=0,kills=0,oxUsed=false,goatUsed=false,tigerUsed=false,tigerChain=false,steps=0,sleepBuf=[],cloneVal=0,cloneMerged=false;
+  if(eq.w==="blade")temp=50;
+  const last=cells[pathIdxs[pathIdxs.length-1]];
+  const bossV=(last&&last.t==='boss')?(last.v||0):0;
+  for(let k=1;k<pathIdxs.length;k++){
+    steps++;
+    if(temp>0)temp=Math.max(0,temp-5); // 腐朽之刃:每走1格临时数值-5
+    const p=cells[pathIdxs[k]];
+    const battle=Math.round((v+temp)*(hasC("dog")?1.4:1)); // 狗符咒:遇敌战斗值+40%
+    if(p.t==='gain'){v+=(p.v??level.gain??2);if(hasC("monkey")&&!cloneMerged)cloneVal+=Math.round((p.v??level.gain)*0.8);}
+    else if(p.t==='mob'||p.t==='elite'){
+      const th=p.v||0;
+      // 虎符咒连杀:开启后下一个 敌人数值≤(当前数值+临时)×2 直接斩杀(一次性,不计门槛)
+      if(tigerChain&&th<=Math.round((v+temp)*2)){
+        tigerChain=false;
+        v+=th;kills++;
+        if(eq.w==="scythe")v+=5;              // 贪婪镰刀:每杀+5
+        if(hasC("rat"))v+=Math.round(th*0.3); // 鼠符咒:击败额外+30%
+        if(hasC("monkey")&&!cloneMerged)cloneVal+=Math.round(th*0.8);
+        continue;
+      }
+      let canPass=battle>=th;
+      if(!canPass&&hasC("ox")&&!oxUsed){oxUsed=true;canPass=true;} // 牛符咒:首次失败掷骰救回(耗1骰),救回后照常击败吸收
+      if(!canPass&&hasC("goat")&&!goatUsed){goatUsed=true;canPass=true;} // 羊符咒:替罪羊承担失败,吸收20%(此处简化按通过)
+      if(!canPass){blocked=true;reason=(p.t==='elite'?'精英':'小怪')+th+'卡门(此处'+battle+')';break;}
+      if(battle-th<minFree)minFree=battle-th;
+      v+=th;kills++;
+      if(eq.w==="scythe")v+=5;
+      if(hasC("rat"))v+=Math.round(th*0.3);
+      if(hasC("monkey")&&!cloneMerged)cloneVal+=Math.round(th*0.8);
+      // 虎符咒:击败本局第一个敌人后进入连杀状态(每局一次)
+      if(hasC("tiger")&&!tigerUsed){tigerUsed=true;tigerChain=true;}
+    }
+    else if(p.t==='chest'&&p.rt==='value'){v+=(p.ra||0);if(hasC("monkey")&&!cloneMerged)cloneVal+=Math.round((p.ra||0)*0.8);}
+    else if(p.t==='chest'&&p.rt==='dice')dice+=(p.ra||0);
+    else if(p.t==='dice')dice+=(p.v||0);
+    else if(p.t==='sleep'){
+      // 沉睡格:集满3个同时苏醒;鸡符咒苏醒收益×2(200%)
+      const srt=p.rt||'value';
+      const raw=p.ra!=null?p.ra:(p.v!=null?p.v:(srt==='dice'?1:srt==='coin'?10:level.gain??2));
+      const addSleep=(amt)=>{if(srt==='dice')dice+=amt;else if(srt==='coin'){}else{v+=amt;if(hasC("monkey")&&!cloneMerged)cloneVal+=Math.round(amt*0.8);}};
+      const mult=hasC("rooster")?2:1;
+      sleepBuf.push({rt:srt,amt:raw});
+      if(sleepBuf.length>=3){const batch=sleepBuf.splice(0,3);batch.forEach(x=>addSleep(Math.round(x.amt*mult)));}
+    }
+    else if(p.t==='clone'){
+      // 分身格:融合吸收分身积累值
+      cloneMerged=true;v+=cloneVal;cloneVal=0;
+    }
+  }
+  if(!blocked&&last&&last.t==='boss'){
+    const battle=Math.round((v+temp)*(hasC("dog")?1.4:1));
+    if(battle<bossV){blocked=true;reason='终值'+battle+'<Boss'+bossV;}
+    else if(battle-bossV<minFree)minFree=battle-bossV;
+  }
+  // 马符咒:首骰+末骰×2 ≈ 行动点 +2 骰(近似);虎/龙/蛇/兔/猴 为策略性效果,难数值化
+  const effDice=Math.max(0,level.dice+dice+(eq.w==="dagger"?1:0)+(hasC("horse")?2:0)-(oxUsed?1:0)+(hasC("pig")?Math.ceil(steps*0.45):0));
+  return{finalValue:v,bossValue:bossV,margin:v-bossV,blocked,reason,steps:pathIdxs.length-1,minFree:blocked?-Infinity:minFree,dice,effDice,oxUsed,kills};
+}
+// ============================================================
+//  岔路补给分析:一条主路(spine)旁的旁支子图,统计可收集的数值/骰子/敌人/往返行动点
+// ============================================================
+function findBranches(cells,adj,spineSet,level){
+  const branches=[],visited=new Set();
+  spineSet.forEach(i=>{
+    adj[i].forEach(j=>{
+      if(spineSet.has(j)||visited.has(j))return;
+      const bset=new Set([j]),q=[j];visited.add(j);
+      for(let h=0;h<q.length;h++){
+        const u=q[h];
+        adj[u].forEach(v=>{if(!spineSet.has(v)&&!visited.has(v)){visited.add(v);bset.add(v);q.push(v);}});
+      }
+      let value=0,dice=0,enemyVal=0;const enemies=[];
+      bset.forEach(ci=>{
+        const p=cells[ci];
+        if(p.t==='gain')value+=(p.v??level.gain??2);
+        else if(p.t==='chest'&&p.rt==='value')value+=(p.ra||0);
+        else if(p.t==='chest'&&p.rt==='dice')dice+=(p.ra||0);
+        else if(p.t==='dice')dice+=(p.v||0);
+        else if(p.t==='mob'||p.t==='elite'){enemies.push({v:p.v,elite:p.t==='elite'});enemyVal+=p.v;}
+      });
+      branches.push({root:j,cells:[...bset],value,dice,enemies,enemyVal,ap:bset.size}); // 回头免费,只算单程
+    });
+  });
+  return branches;
+}
+// 路线分析:每条主路 + 其岔路补给 → 数值/行动点/到达概率/裕度
+function routeAnalysis(level,equip){
+  const cells=level.path||[];
+  // 难度分析:含"跳跃/搭路边"(模拟兔符咒/自由跳跃/龙符咒铺云跨越断口),使断路但可跳跃/搭路连通的关可算
+  const adj=buildAdj(cells,{jump:true});
+  const s=cells.findIndex(c=>c.t==='start'),b=cells.findIndex(c=>c.t==='boss');
+  if(s<0||b<0)return[];
+  const eq=equip||{w:null,c:[]};
+  const paths=getAllPathsDFS(cells,adj,s,b).slice(0,30);
+  return paths.map(idxArr=>{
+    const spineSet=new Set(idxArr);
+    const sp=simulatePath(cells,idxArr,level,eq);
+    const branches=findBranches(cells,adj,spineSet,level);
+    let bonusVal=0,bonusDice=0,bonusAp=0,bonusEnemy=0;
+    const branchList=[];
+    branches.forEach(br=>{
+      bonusVal+=br.value;bonusDice+=br.dice;bonusAp+=br.ap;bonusEnemy+=br.enemyVal;
+      branchList.push({root:br.root,value:br.value,dice:br.dice,ap:br.ap,enemies:br.enemies,enemyVal:br.enemyVal,cells:br.cells});
+    });
+    const totalSteps=sp.steps+bonusAp;
+    const effDice=Math.max(0,level.dice+sp.dice+bonusDice+(eq.w==="dagger"?1:0)-(sp.oxUsed?1:0));
+    const reach=calcReach(eq.w,effDice,totalSteps);
+    const tempSpine=(eq.w==="blade"?Math.max(0,50-5*sp.steps):0);
+    const tempTotal=(eq.w==="blade"?Math.max(0,50-5*totalSteps):0);
+    const totalVal=sp.finalValue+bonusVal;
+    const spineBattle=Math.round((sp.finalValue+tempSpine)*(eq.c&&eq.c.includes("dog")?1.4:1));
+    const battle=Math.round((totalVal+tempTotal)*(eq.c&&eq.c.includes("dog")?1.4:1));
+    const margin=battle-sp.bossValue;
+    // 主路是否被中途怪卡死(仅Boss数值不足可被岔路补给救)
+    const spineWalkable=!sp.blocked||/Boss/.test(sp.reason||'');
+    const spineReach=calcReach(eq.w,sp.effDice,sp.steps);
+    const spinePass=spineWalkable&&spineBattle>=sp.bossValue;
+    const fullPass=spineWalkable&&margin>=0;
+    const winReach=Math.max(spinePass?spineReach:0,fullPass?reach:0);
+    return {spineSteps:sp.steps,totalSteps,spineVal:sp.finalValue,bonusVal,bonusDice,bonusAp,bonusEnemy,totalVal,effDice,reach,spineReach,winReach,spineBattle,margin,slack:Number.isFinite(sp.minFree)?sp.minFree:margin,bossV:sp.bossValue,blocked:sp.blocked,reason:sp.reason,minFree:sp.minFree,oxUsed:sp.oxUsed,branches:branchList,spinePass,fullPass};
+  });
+}
+function calculateValuePotential(level){
+  // 取最短路径的数值潜力（主路径）
+  const cells=level.path||[],adj=buildAdj(cells);
+  const s=cells.findIndex(c=>c.t==='start'),b=cells.findIndex(c=>c.t==='boss');
+  if(s<0||b<0)return{finalValue:level.startVal,bossValue:0,margin:0,blocked:true,reason:'缺起点或Boss'};
+  const main=bfsPath(cells,adj,s,b);
+  if(main.length===0)return{finalValue:level.startVal,bossValue:cells[b].v||0,margin:-(cells[b].v||0),blocked:true,reason:'起点无法到达Boss'};
+  return simulatePath(cells,main,level);
+}
+function validateLevel(level){
+  const errs=[],warns=[],path=level.path||[];
+  if(path.length===0)return['路径为空'];
+  if(!path.some(p=>p.t==='start'))errs.push('缺少起点');
+  if(!path.some(p=>p.t==='boss'))errs.push('缺少Boss');
+  if(path.filter(p=>p.t==='start').length>1)errs.push('起点超过1个');
+  if(path.filter(p=>p.t==='boss').length>1)errs.push('Boss超过1个');
+  const seen=new Set();
+  path.forEach(p=>{if(seen.has(key(p.c,p.r,pz(p))))errs.push('重复格('+p.c+','+p.r+')');seen.add(key(p.c,p.r,pz(p)));if(p.c<0||p.c>=GRID||p.r<0||p.r>=GRID)errs.push('('+p.c+','+p.r+')越界');});
+  // 连通性：断路不再阻止保存/导入——允许"跳跃(半径2)/龙符咒铺云搭桥/跨层传送门"设计(如第33关/50关)。
+  // 孤立格一律允许(可作跳跃落点/奖励宝箱/未来机制),不再逐格报"孤立"。
+  // 可达 = 步行(正交/传送门边,同层) + 跳跃(可达格半径2,同层) 扩展。
+  const adj=buildAdj(path),s=path.findIndex(p=>p.t==='start');
+  if(s>=0){
+    const reach=new Set([s]),q=[s];
+    while(q.length){const id=q.shift();adj[id].forEach(n=>{if(!reach.has(n)){reach.add(n);q.push(n);}});}
+    // 跳跃扩展:可达格的半径2跳跃落点也视为可达(兔跃孤立Boss,同层)
+    const expanded=new Set(reach);
+    reach.forEach(ri=>{
+      const r=path[ri];
+      path.forEach((p,i)=>{
+        if(expanded.has(i)||pz(p)!==pz(r))return;
+        const dc=Math.abs(r.c-p.c),dr=Math.abs(r.r-p.r);
+        if((dc===2&&dr===0)||(dc===0&&dr===2)||(dc===2&&dr===2))expanded.add(i);
+      });
+    });
+    const b=path.findIndex(p=>p.t==='boss');
+    if(b>=0&&!expanded.has(b))warns.push('起点无法步行/跳跃/传送门到达Boss——断路或跨层设计，玩家需用「跳跃」「跨层传送门」或龙符咒「铺云雾搭桥」通关（仍可保存/导入）');
+  }
+  return {errs,warns};
+}
+function calculateDifficulty(level,equip){
+  const eq=equip||{w:null,c:[]};
+  const cfg=DIFFICULTY_CONFIG,cells=level.path||[],adj=buildAdj(cells);
+  const s=cells.findIndex(c=>c.t==='start'),b=cells.findIndex(c=>c.t==='boss');
+  const zero={reach:0,value:0};
+  if(s<0||b<0)return{score:100,stars:1,reachProb:0,valRatio:0,bestVal:0,bossNeed:0,margin:0,bestSlack:0,pathLen:0,mobCount:0,eliteCount:0,chestCount:0,gainCount:0,branchCount:0,viable:0,totalPaths:0,subscores:zero,diags:[{t:'bad',m:'❌ 缺起点或Boss'}],unplayable:true,routeInfo:null};
+  const routes=routeAnalysis(level,eq);
+  if(routes.length===0)return{score:95,stars:5,reachProb:0,valRatio:0,bestVal:0,bossNeed:0,margin:0,bestSlack:0,pathLen:0,mobCount:0,eliteCount:0,chestCount:0,gainCount:0,branchCount:0,viable:0,totalPaths:0,subscores:zero,diags:[{t:'bad',m:'❌ 起点无法到达Boss'}],unplayable:true,routeInfo:null};
+  const bossNeed=(cells[b].v||0);
+  const pathLen=Math.min(...routes.map(r=>r.spineSteps));
+  const mobCount=cells.filter(c=>c.t==='mob').length;
+  const eliteCount=cells.filter(c=>c.t==='elite').length;
+  const chestCount=cells.filter(c=>c.t==='chest').length;
+  const gainCount=cells.filter(c=>c.t==='gain').length;
+  const branchCount=adj.filter(ns=>ns.length>2).length;
+  const deadEnds=adj.reduce((a,ns,i)=>a+(ns.length===1&&cells[i].t!=='start'&&cells[i].t!=='boss'?1:0),0);
+  const zeroRet={score:100,stars:1,reachProb:0,valRatio:0,bestVal:0,bossNeed,margin:0,bestSlack:0,pathLen,mobCount,eliteCount,chestCount,gainCount,branchCount,viable:0,totalPaths:routes.length,subscores:{reach:0,value:100},diags:[{t:'bad',m:'❌ 主路全被中途怪卡死——可尝试切换装备(如狗符咒/武器)后重新计算'}],unplayable:true,routeInfo:null};
+  // 可达路线:主路走得通(仅Boss数值不足可用岔路补给救)
+  const walkable=routes.filter(r=>!r.blocked||/Boss/.test(r.reason||''));
+  if(walkable.length===0)return zeroRet;
+  // 数值达成:最高可达数值(含岔路补给)与Boss需求之比
+  const bestVal=Math.max(...walkable.map(r=>r.margin+r.bossV));
+  const bestSlack=Math.max(...walkable.map(r=>r.slack));
+  const bestMargin=Math.max(...walkable.map(r=>r.margin));
+  const valRatio=bestVal/Math.max(1,bossNeed);
+  // 行动点达成:取各可达路线中最优"胜率"(主路数值够则用省点走法,否则需岔路补给)
+  let best=null,bestWin=0;
+  walkable.forEach(r=>{
+    const reach=(r.spineBattle>=bossNeed)? r.spineReach : r.reach;
+    const wp=Math.min(1,valRatio)*reach;
+    if(wp>bestWin){bestWin=wp;best=r;}
+  });
+  const reachProb=best?(best.spineBattle>=bossNeed?best.spineReach:best.reach):0;
+  const slackAnxiety=Math.max(0,(cfg.comfortSlack-bestSlack)/Math.max(1,cfg.comfortSlack));
+  // 连续风险(不再一刀切100):数值够→0(紧余量由slackAnxiety微调),不够→随缺口平滑上升
+  let valueRisk;
+  if(valRatio>=1)valueRisk=0;
+  else valueRisk=Math.min(100,100*Math.max(0,(1.05-valRatio)/0.5)); // 缺口5%→10,25%→50,55%+→100
+  let reachRisk=100*Math.max(0,1-reachProb);
+  reachRisk=Math.min(100,reachRisk*(1+slackAnxiety*cfg.slackAmp));
+  const w=cfg.weights;
+  let score=Math.round(valueRisk*w.value+reachRisk*w.reach);
+  // 完全到不了(全最大行动点都不够最短主路)→95+
+  const unplayableSteps=!walkable.some(r=>r.effDice*weaponMaxDie(eq.w)>=r.spineSteps);
+  if(unplayableSteps)score=Math.max(score,95);
+  if(valRatio<0.5&&!unplayableSteps)score=Math.max(score,92); // 数值缺口过大也逼近不可玩
+  score=Math.min(100,Math.max(0,score));
+  const stars=score<cfg.starCuts[0]?1:score<cfg.starCuts[1]?2:score<cfg.starCuts[2]?3:score<cfg.starCuts[3]?4:5;
+  const diags=[];
+  if(unplayableSteps)diags.push({t:'bad',m:'❌ 全最大行动点仍到不了Boss（行动点不足）'});
+  else if(reachProb>=0.95)diags.push({t:'good',m:'✓ 行动点充裕（到达概率'+(reachProb*100).toFixed(0)+'%）'});
+  else if(reachProb>=0.7)diags.push({t:'warn',m:'⚠ 行动点偏紧（到达概率'+(reachProb*100).toFixed(0)+'%）'});
+  else diags.push({t:'bad',m:'❌ 行动点吃紧（到达概率仅'+(reachProb*100).toFixed(0)+'%）'});
+  if(valRatio>=1){
+    if(bestSlack<cfg.comfortSlack)diags.push({t:'warn',m:'⚠ 数值偏紧：余量+'+bestSlack+'（舒适线+'+cfg.comfortSlack+'）'});
+    else diags.push({t:'good',m:'✓ 数值充裕：余量+'+bestSlack});
+  }else{
+    diags.push({t:'warn',m:'⚠ 数值缺口 '+Math.round((1-valRatio)*100)+'%（可达 '+bestVal.toFixed(0)+' / 需 '+bossNeed+'）——加增益/宝箱或换装备'});
+  }
+  if(best&&best.bonusVal>0)diags.push({t:'info',m:'· 最优路线岔路补给：数值+'+best.bonusVal+(best.bonusDice>0?' · 骰子+'+best.bonusDice:'')+' · 行动点+'+best.bonusAp});
+  const blockedRatio=1-walkable.length/routes.length;
+  if(blockedRatio>0)diags.push({t:'warn',m:'⚠ '+(routes.length-walkable.length)+'条路线主路被中途怪卡死'});
+  if(deadEnds>0)diags.push({t:'info',m:'· '+deadEnds+'个死胡同（往返免费，仅耗进点）'});
+  if(branchCount>0)diags.push({t:'info',m:'· '+branchCount+'处分叉让选择有意义'});
+  else if(pathLen>0)diags.push({t:'info',m:'· 线性无分叉（决策少）'});
+  if(eq.w||(eq.c&&eq.c.filter(Boolean).length)){
+    if(eq.c&&eq.c.includes("dog"))diags.push({t:'info',m:'· 狗符咒：战斗值×1.4（已计入）'});
+    if(eq.c&&eq.c.includes("ox")&&routes.some(r=>r.oxUsed))diags.push({t:'info',m:'· 牛符咒救回过失败检定（耗1骰，实际为掷骰概率）'});
+    if(eq.w==="blade")diags.push({t:'info',m:'· 腐朽之刃：开局临时+50逐格-5（已计入）'});
+    if(eq.w==="cursed")diags.push({t:'info',m:'· 诅咒骰：每骰+2（忽略掷6损骰的近似）'});
+  }
+  return{score,stars,reachProb,valRatio,bestVal,bossNeed,margin:bestMargin,bestSlack,pathLen,shortestFeasible:best?best.spineSteps:pathLen,bestSteps:best?best.totalSteps:0,bestDice:best?best.effDice:0,mobCount,eliteCount,chestCount,gainCount,branchCount,viable:walkable.length,totalPaths:routes.length,subscores:{reach:Math.round(reachRisk),value:Math.round(valueRisk)},diags,unplayable:unplayableSteps,bestValSpine:best?best.spineVal:level.startVal,routeInfo:best};
+}
+
+function renderDifficulty(){
+  const box=document.getElementById('diffPanel');
+  const v=validateLevel(E.level);
+  if(v.errs.length){box.innerHTML='<div class="diag bad"><b>地图不合法</b><br>'+v.errs.join('<br>')+'</div>';return;}
+  let warnHTML=v.warns.length?('<div class="diag warn">'+v.warns.join('<br>')+'</div>'):'';
+  const d=calculateDifficulty(E.level,E.equip);
+  const starStr='★★★★★'.slice(0,d.stars)+'☆☆☆☆☆'.slice(0,5-d.stars);
+  const target=+document.getElementById('fTarget').value||0;
+  const diff=d.score-target;
+  let html=`<div style="display:flex;align-items:center;justify-content:space-between"><span class="dscore">${d.score}/100</span><span class="dstars">${starStr}</span></div>`;
+  if(target){const c=Math.abs(diff)<=5?'#9fe0bd':(diff>0?'#fca5a5':'#fde68a');html+=`<div style="font-size:11px;color:${c};margin-top:2px">${diff>0?'高于':'低于'}目标 ${Math.abs(diff)}（目标${target}）</div>`;}
+  html+=`<div class="statline"><span class="k">按装备模拟</span><span class="v">${equipLabel()}</span></div>`;
+  html+=`<div class="dbar"><div class="dbarfill" style="width:${d.score}%"></div></div>`;
+  // 数值达成条
+  const vr=Math.min(100,(d.valRatio*100).toFixed(0));
+  const vrColor=d.valRatio>=1?'#3fb56b':(d.valRatio>=0.8?'#fbbf24':'#d44058');
+  html+=`<div class="statline"><span class="k">数值达成</span><span class="v" style="color:${vrColor}">${d.bestVal.toFixed(0)} / ${d.bossNeed}（${(d.valRatio*100).toFixed(0)}%）</span></div>`;
+  html+=`<div class="subscore"><span></span><span class="b"><i style="width:${vr}%;background:${vrColor}"></i></span><span></span></div>`;
+  // 行动点达成条
+  const rr=(d.reachProb*100).toFixed(0);
+  const rrColor=d.reachProb>=0.95?'#3fb56b':(d.reachProb>=0.7?'#fbbf24':'#d44058');
+  html+=`<div class="statline"><span class="k">行动点达成</span><span class="v" style="color:${rrColor}">${rr}%</span></div>`;
+  html+=`<div class="subscore"><span></span><span class="b"><i style="width:${rr}%;background:${rrColor}"></i></span><span></span></div>`;
+  html+=`<div class="statline"><span class="k">数值裕度</span><span class="v" style="color:${d.bestSlack>=0?'#9fe0bd':'#fca5a5'}">${d.bestSlack<0?'×':('+'+d.bestSlack)}</span></div>`;
+  html+=`<div class="statline"><span class="k">可行路线</span><span class="v">${d.viable}/${d.totalPaths}</span></div>`;
+  html+=`<div class="statline"><span class="k">最优路线 步数/有效骰</span><span class="v">${d.bestSteps} 步 / 骰${d.bestDice}</span></div>`;
+  html+=`<div class="statline"><span class="k">最短路径</span><span class="v">${d.pathLen} 步</span></div>`;
+  html+=`<div class="statline"><span class="k">怪/精英/宝箱/增益/分叉</span><span class="v">${d.mobCount}/${d.eliteCount}/${d.chestCount}/${d.gainCount}/${d.branchCount}</span></div>`;
+  // 补给路线分析:主路 + 岔路补给(先去岔路拿宝箱的策略)
+  if(d.routeInfo){
+    const r=d.routeInfo;
+    html+='<div style="margin-top:10px;font-size:10px;color:#8d84b8;font-weight:700">补给路线分析（最优 · 主路+岔路）</div>';
+    html+=`<div class="statline"><span class="k">主路</span><span class="v">${r.spineSteps}步 · 数值${r.spineVal}</span></div>`;
+    if(r.branches.length){
+      html+='<div style="font-size:10px;color:#8d84b8;font-weight:700;margin-top:3px">岔路补给（'+r.branches.length+'支）</div>';
+      r.branches.forEach(br=>{
+        const parts=[];
+        if(br.value>0)parts.push('数值+'+br.value);
+        if(br.dice>0)parts.push('骰+'+br.dice);
+        if(br.enemies.length)parts.push('怪'+br.enemies.map(e=>e.v).join('/'));
+        html+=`<div class="pathrow"><span class="ok">⇄</span><span class="s">去返${br.ap}步</span><span class="v">${parts.join(' · ')||'空'}</span></div>`;
+      });
+    }else{
+      html+=`<div class="statline"><span class="k">岔路补给</span><span class="v">无</span></div>`;
+    }
+    html+=`<div class="statline"><span class="k" style="color:#fbbf24">合计(含补给)</span><span class="v" style="color:#fbbf24">数值${r.totalVal} · ${r.totalSteps}步 · 到达${(r.reach*100).toFixed(0)}%</span></div>`;
+    if(r.bonusEnemy>0)html+=`<div class="statline"><span class="k">岔路清怪可再+</span><span class="v" style="color:#52f09a">+${r.bonusEnemy}</span></div>`;
+    html+=`<div class="statline"><span class="k">数值裕度(vs Boss ${r.bossV})</span><span class="v" style="color:${r.margin>=0?'#9fe0bd':'#fca5a5'}">${r.margin>=0?'+':''}${r.margin}</span></div>`;
+  }
+  html+='<div style="margin-top:8px;font-size:10px;color:#8d84b8;font-weight:700">风险构成（权重）</div>';
+  const w=DIFFICULTY_CONFIG.weights,sl={value:['数值缺口',w.value],reach:['行动点',w.reach]};
+  for(const k in sl){const v=d.subscores[k];html+=`<div class="subscore"><span>${sl[k][0]} (${(sl[k][1]*100)|0}%)</span><span class="b"><i style="width:${v}%"></i></span><span>${v}</span></div>`;}
+  html+=d.diags.map(x=>`<div class="diag ${x.t}">${x.m}</div>`).join('');
+  box.innerHTML=warnHTML+html;
+}
+
+// ============================================================
+//  到达本格 · 路径分析（点击格子 → 各路径到达数值/行动点）
+// ============================================================
+function analyzePathsTo(c,r){
+  const lv=E.level,cells=lv.path||[],adj=buildAdj(cells);
+  const s=cells.findIndex(x=>x.t==='start'),t=cells.findIndex(x=>x.c===c&&x.r===r);
+  if(s<0)return null;
+  if(t<0)return{noTarget:true,total:0};
+  const paths=[],cur=[],seen=new Set();
+  (function dfs(id){
+    if(seen.has(id))return;seen.add(id);cur.push(id);
+    if(id===t)paths.push(cur.slice());
+    else adj[id].forEach(n=>dfs(n));
+    cur.pop();seen.delete(id);
+  })(s);
+  const infos=paths.slice(0,30).map(px=>{
+    const r=simulatePath(cells,px,lv,E.equip);
+    return{steps:r.steps,v:r.finalValue,ok:!r.blocked,reason:r.blocked?r.reason:'',dice:r.dice,ox:r.oxUsed};
+  });
+  const okList=infos.filter(x=>x.ok);
+  return{total:infos.length,ok:okList.length,minV:okList.length?Math.min(...okList.map(x=>x.v)):null,maxV:okList.length?Math.max(...okList.map(x=>x.v)):null,avgV:okList.length?okList.reduce((a,x)=>a+x.v,0)/okList.length:null,avgSteps:okList.length?okList.reduce((a,x)=>a+x.steps,0)/okList.length:null,avgDice:okList.length?okList.reduce((a,x)=>a+x.dice,0)/okList.length:null,infos,isStart:cells[t].t==='start',isBoss:cells[t].t==='boss'};
+}
+function renderCellAnalysis(){
+  const box=document.getElementById('cellAnalysis');
+  if(!E.selected){box.innerHTML='<div class="hint">点击一个格子查看其路径分析</div>';return;}
+  const a=analyzePathsTo(E.selected.c,E.selected.r);
+  if(!a){box.innerHTML='<div class="hint">地图缺少起点</div>';return;}
+  if(a.noTarget||a.total===0){box.innerHTML='<div class="hint">该格不可达（或不是路径格）</div>';return;}
+  const f1=x=>x==null?'×':Math.round(x*10)/10;
+  let html='';
+  if(a.isStart)html=`<div class="statline"><span class="k">这是起点</span><span class="v">数值${E.level.startVal} · 0步</span></div>`;
+  else{
+    html+=`<div class="statline"><span class="k">可行路径</span><span class="v">${a.ok}/${a.total}</span></div>`;
+    html+=`<div class="statline"><span class="k">到达数值 最小/最大</span><span class="v">${f1(a.minV)} / ${f1(a.maxV)}</span></div>`;
+    html+=`<div class="statline"><span class="k">期望数值</span><span class="v" style="color:#fbbf24">${a.ok?f1(a.avgV):'×'}</span></div>`;
+    html+=`<div class="statline"><span class="k">期望行动点</span><span class="v">${a.ok?f1(a.avgSteps):'×'} 步</span></div>`;
+    if(a.ok)html+=`<div class="statline"><span class="k">期望耗骰(均值3.5)</span><span class="v">${(a.avgSteps/3.5).toFixed(1)} 个</span></div>`;
+    if(a.avgDice>0)html+=`<div class="statline"><span class="k">途中补充骰子(期望)</span><span class="v" style="color:#ffd257">+${f1(a.avgDice)}</span></div>`;
+    if(a.total>a.ok)html+=`<div class="statline"><span class="k">被卡死路径</span><span class="v" style="color:#d44058">${a.total-a.ok} 条</span></div>`;
+    if(a.isBoss)html+='<div class="statline"><span class="k">终点判定</span><span class="v">数值需≥Boss</span></div>';
+    if(E.equip.w||(E.equip.c&&E.equip.c.filter(Boolean).length)){
+      const dog=E.equip.c&&E.equip.c.includes("dog");
+      const blade=E.equip.w==="blade";
+      const notes=[];
+      if(dog)notes.push('狗:战斗值=数值×1.4');
+      if(blade)notes.push('刀:临时+50逐格-5');
+      html+=`<div class="hint" style="margin-top:5px">${equipLabel()} · ${notes.join('；')||'已按装备判定'}</div>`;
+    }
+    const good=a.infos.filter(x=>x.ok).slice(0,30);
+    html+='<div style="margin-top:7px;font-size:10px;color:#8d84b8;font-weight:700">各路径明细（'+good.length+'条）</div>';
+    html+=good.map(x=>`<div class="pathrow"><span class="ok">✓</span><span class="s">${x.steps}步</span><span class="v">数值${x.v}</span>${x.dice>0?`<span class="d">骰+${x.dice}</span>`:''}</div>`).join('');
+    const bads=a.infos.filter(x=>!x.ok).slice(0,6);
+    if(bads.length)html+=`<div style="margin-top:3px;font-size:10px;color:#d44058">✗ ${bads.map(x=>x.steps+'步·'+x.reason).join('；')}</div>`;
+  }
+  box.innerHTML=html;
+}
+
+// ============================================================
+//  关卡信息 / 关卡库 / 导入导出
+// ============================================================
+function syncMeta(){
+  E.level.id=+document.getElementById('fId').value||1;
+  E.level.name=document.getElementById('fName').value;
+  E.level.startVal=+document.getElementById('fStart').value||4;
+  E.level.dice=+document.getElementById('fDice').value||5;
+  E.level.gain=+document.getElementById('fGain').value||2;
+  document.getElementById('lvTitle').textContent='编辑器 · 第'+E.level.id+'关 · '+E.level.name;
+  renderAll();
+}
+function newLevel(){E.level={id:+document.getElementById('fId').value||1,name:'新关卡',startVal:4,dice:5,gain:2,path:[]};E.selected=null;document.getElementById('fName').value='新关卡';document.getElementById('fStart').value=4;document.getElementById('fDice').value=5;document.getElementById('fGain').value=2;syncMeta();}
+function libLoad(){try{const s=localStorage.getItem(LIB_KEY);if(s)LEVELS_LIB=JSON.parse(s);}catch(e){LEVELS_LIB={};}}
+function libSave(){localStorage.setItem(LIB_KEY,JSON.stringify(LEVELS_LIB));}
+function cellToExport(p){const o={c:p.c,r:p.r,t:p.t};if(p.z&&p.z!==1)o.z=p.z;if(['mob','elite','boss','gain','coin','dice','sleep'].includes(p.t))o.v=p.v;if(p.scapegoat)o.scapegoat=true;if(p.t==='chest'){o.rt=p.rt;o.ra=p.ra;}if(p.t==='sleep'){if(p.rt&&p.rt!=='value')o.rt=p.rt;o.ra=p.ra;}if(p.t==='trap'){o.eff=p.eff;o.ra=p.ra;}if(p.t==='portal'&&p.link&&p.link.c!=null){o.link={c:p.link.c,r:p.link.r};if(p.link.z&&p.link.z!==1)o.link.z=p.link.z;}return o;}
+function buildExport(){
+  const lv=E.level,cells=lv.path||[],adj=buildAdj(cells);
+  const s=cells.findIndex(c=>c.t==='start'),b=cells.findIndex(c=>c.t==='boss');
+  let pathOut=[];
+  if(s>=0&&b>=0)pathOut=bfsPath(cells,adj,s,b).map(i=>cellToExport(cells[i]));
+  const cellsOut=cells.map(cellToExport);
+  const out={id:lv.id,name:lv.name,startVal:lv.startVal,dice:lv.dice,gain:lv.gain,path:pathOut};
+  if(cellsOut.length!==pathOut.length)out.cells=cellsOut; // 有分叉时保存全图便于再编辑
+  return out;
+}
+function saveToLib(){
+  const v=validateLevel(E.level);
+  if(v.errs.length){toast('地图不合法：'+v.errs[0]);return;}
+  LEVELS_LIB[E.level.id]=buildExport();libSave();renderLib();toast('第'+E.level.id+'关已存入（共'+Object.keys(LEVELS_LIB).length+'关）');
+}
+function loadFromLib(id){
+  const lv=LEVELS_LIB[id];if(!lv)return;
+  const cells=lv.cells||lv.path||[];
+  E.level={id:lv.id||1,name:lv.name||'-',startVal:lv.startVal||4,dice:lv.dice||5,gain:lv.gain||2,path:JSON.parse(JSON.stringify(cells))};
+  document.getElementById('fId').value=E.level.id;document.getElementById('fName').value=E.level.name;
+  document.getElementById('fStart').value=E.level.startVal;document.getElementById('fDice').value=E.level.dice;
+  document.getElementById('fGain').value=E.level.gain;E.selected=null;syncMeta();toast('已加载第'+id+'关');
+}
+function deleteFromLib(){if(!LEVELS_LIB[E.level.id]){toast('当前关不在库中');return;}if(!confirm('从库删除第'+E.level.id+'关？'))return;delete LEVELS_LIB[E.level.id];libSave();renderLib();toast('已删除');}
+// 用内嵌权威关卡源(levels/level_2.json)覆盖关卡库中的指定关
+function restoreSourceLevel(id){
+  if(!LEVEL_SOURCE[id]){toast('没有第'+id+'关的权威数据');return;}
+  LEVELS_LIB[id]=JSON.parse(JSON.stringify(LEVEL_SOURCE[id]));
+  libSave();renderLib();
+  loadFromLib(id);
+  toast('第'+id+'关已恢复为 level_'+id+'.json');
+}
+function renderLib(){
+  const box=document.getElementById('libList');const ids=Object.keys(LEVELS_LIB).map(Number).sort((a,b)=>a-b);
+  if(ids.length===0){box.innerHTML='<div style="padding:8px;font-size:11px;color:#5b537a;text-align:center">库为空</div>';return;}
+  box.innerHTML=ids.map(id=>{const lv=LEVELS_LIB[id];const cur=lv.id===E.level.id;return `<div onclick="loadFromLib(${id})" style="padding:6px 9px;font-size:12px;font-weight:700;cursor:pointer;border-bottom:1px solid #2c2448;display:flex;justify-content:space-between;align-items:center;${cur?'background:#2a2350;color:#fbbf24':''}"><span>第${id}关 · ${lv.name||'-'}</span><span style="font-size:10px;color:#8d84b8">${(lv.cells||lv.path||[]).length}格</span></div>`;}).join('');
+}
+function downloadFile(f,c){const b=new Blob([c],{type:'application/json'}),u=URL.createObjectURL(b),a=document.createElement('a');a.href=u;a.download=f;document.body.appendChild(a);a.click();document.body.removeChild(a);setTimeout(()=>URL.revokeObjectURL(u),1000);}
+function downloadCurrent(){const o=buildExport();downloadFile('level_'+o.id+'.json',JSON.stringify(o,null,2));toast('已下载 level_'+o.id+'.json');}
+function exportAllFile(){const ids=Object.keys(LEVELS_LIB);if(ids.length===0){toast('库为空');return;}const arr=Object.keys(LEVELS_LIB).map(Number).sort((a,b)=>a-b).map(id=>LEVELS_LIB[id]);downloadFile('levels.json',JSON.stringify(arr,null,2));toast('已下载 levels.json（'+arr.length+'关）');}
+function copyJSON(){document.getElementById('jsonOut').value=JSON.stringify(buildExport(),null,2);const ta=document.getElementById('jsonOut');ta.select();document.execCommand('copy');toast('已复制');}
+function loadLevelIntoEditor(lv){
+  const cells=lv.cells||lv.path||[];
+  E.level={id:lv.id||1,name:lv.name||'导入',startVal:lv.startVal||4,dice:lv.dice||5,gain:lv.gain||2,path:JSON.parse(JSON.stringify(cells))};
+  document.getElementById('fId').value=E.level.id;
+  document.getElementById('fName').value=E.level.name;
+  document.getElementById('fStart').value=E.level.startVal;
+  document.getElementById('fDice').value=E.level.dice;
+  document.getElementById('fGain').value=E.level.gain;
+  E.selected=null;syncMeta();
+}
+// 导入单关 JSON 文件:读取关卡地图与设定并载入编辑器
+function importJSONFile(ev){
+  const f=ev.target.files&&ev.target.files[0];
+  if(!f)return;
+  const rd=new FileReader();
+  rd.onload=()=>{
+    try{
+      const lv=JSON.parse(rd.result);
+      if(!lv||!((lv.cells||lv.path)||[]).length)throw new Error('空地图');
+      loadLevelIntoEditor(lv);
+      toast('已导入 '+f.name);
+    }catch(e){toast('解析失败：'+(e.message||'格式错误'));}
+  };
+  rd.readAsText(f);
+  ev.target.value='';
+}
+
+// ============================================================
+//  游戏本体读写 —— File System Access API，按 ID 替换关卡
+// ============================================================
+let gameFileHandle=null, gameFileText=null;
+function findLEVELSArray(text){
+  const m=text.match(/LEVELS\s*=\s*\[/);
+  if(!m)return null;
+  const openBracket=m.index+m[0].length-1;
+  let depth=0,i=openBracket;
+  for(;i<text.length;i++){if(text[i]==='[')depth++;else if(text[i]===']'){depth--;if(depth===0)break;}}
+  if(depth!==0)return null;
+  return{prefix:text.slice(0,openBracket),arrayText:text.slice(openBracket,i+1),suffix:text.slice(i+1)};
+}
+function normalizeGameLevel(lv){
+  const all=(lv.cells||lv.path||[]).map(p=>Object.assign({},p));
+  const out={id:lv.id,name:lv.name||('第'+lv.id+'关'),startVal:lv.startVal||4,dice:lv.dice||5,gain:lv.gain||2,path:all,
+    _sub:lv.sub,_tutorial:lv.tutorial,_size:lv.size};
+  // 保留全图(含岔路):导入本体时不丢分支;buildExport 会按 E.level.path 重新算 path/cells
+  if(lv.cells&&lv.cells.length>1)out.cells=all.map(p=>Object.assign({},p));
+  return out;
+}
+async function importGameFile(){
+  if(!window.showOpenFilePicker){toast('需Chrome/Edge浏览器');return;}
+  try{
+    const [h]=await window.showOpenFilePicker({types:[{description:'HTML',accept:{'text/html':['.html','.htm']}}]});
+    gameFileHandle=h;
+    const f=await h.getFile();gameFileText=await f.text();
+    const parsed=findLEVELSArray(gameFileText);
+    if(!parsed){toast('未在文件中找到 LEVELS=[...]');return;}
+    let arr;try{arr=new Function('return '+parsed.arrayText)();}catch(e){toast('LEVELS 解析失败：'+e.message);return;}
+    let added=0,skipped=0;
+    arr.forEach(lv=>{
+      if(LEVELS_LIB[lv.id]===undefined){LEVELS_LIB[lv.id]=normalizeGameLevel(lv);added++;}
+      else skipped++; // 库中已有该关(可能手存过):不覆盖,避免丢失岔路/编辑
+    });
+    libSave();renderLib();
+    document.getElementById('lvTitle').textContent='编辑器 · 已导入本体('+added+'新/'+skipped+'跳过) · '+E.level.name;
+    toast('已导入 '+added+' 关（跳过库中已有 '+skipped+' 关，如需覆盖请先删除）');
+  }catch(e){if(e.name!=='AbortError')toast('导入失败：'+e.message);}
+}
+function editorToGameLevel(ed,base){
+  const o=Object.assign({},base||{});
+  o.id=ed.id;o.name=ed.name;o.startVal=ed.startVal;o.dice=ed.dice;o.gain=ed.gain;
+  // 全图优先(cells 含岔路), 线性关退化为 path
+  const cells=ed.cells||ed.path||[],adj=buildAdj(cells);
+  const s=cells.findIndex(c=>c.t==='start'),b=cells.findIndex(c=>c.t==='boss');
+  let mainIdx=[];if(s>=0&&b>=0)mainIdx=bfsPath(cells,adj,s,b);
+  const exp=c=>{const x={c:c.c,r:c.r,t:c.t};if(c.z&&c.z!==1)x.z=c.z;if(['mob','elite','boss','gain','coin','dice','sleep'].includes(c.t))x.v=c.v;if(c.scapegoat)x.scapegoat=true;if(c.t==='chest'){x.rt=c.rt;x.ra=c.ra;}if(c.t==='sleep'){if(c.rt&&c.rt!=='value')x.rt=c.rt;x.ra=c.ra;}if(c.t==='trap'){x.eff=c.eff;x.ra=c.ra;}if(c.t==='portal'&&c.link&&c.link.c!=null){x.link={c:c.link.c,r:c.link.r};if(c.link.z&&c.link.z!==1)x.link.z=c.link.z;}return x;};
+  o.path=mainIdx.map(i=>exp(cells[i]));
+  const allCells=cells.map(exp);
+  if(allCells.length>mainIdx.length)o.cells=allCells; // 有分叉:导出全图,游戏 buildForkGraph 处理岔路选择
+  if(!o.sub)o.sub=ed.name;if(o.tutorial===undefined)o.tutorial=false;if(!o.size)o.size=9;
+  return o;
+}
+async function writeToGameFile(ids){
+  if(!gameFileHandle){toast('请先「导入游戏本体」选择 index.html');return null;}
+  // 关键:每次写回前重新从磁盘读取最新文本,避免用导入时的旧缓存覆盖掉后来新增的游戏代码
+  let latest;
+  try{latest=await (await gameFileHandle.getFile()).text();}
+  catch(e){latest=gameFileText;}
+  const parsed=findLEVELSArray(latest);
+  if(!parsed){toast('未找到 LEVELS 数组');return null;}
+  let arr;try{arr=new Function('return '+parsed.arrayText)();}catch(e){toast('解析失败：'+e.message);return null;}
+  const byId={};arr.forEach(lv=>{byId[lv.id]=lv;});
+  let n=0;for(const id of ids){const ed=LEVELS_LIB[id];if(!ed)continue;byId[id]=editorToGameLevel(ed,byId[id]);n++;}
+  const newArr=Object.keys(byId).map(Number).sort((a,b)=>a-b).map(id=>byId[id]);
+  const newText=parsed.prefix+JSON.stringify(newArr,null,2)+parsed.suffix;
+  try{
+    const w=await gameFileHandle.createWritable();await w.write(newText);await w.close();
+    gameFileText=newText;toast('已写回 '+n+' 关到游戏本体 ✓');return n;
+  }catch(e){toast('写回失败：'+e.message+'（可改用「导出全部」下载）');return null;}
+}
+function writeCurrentToGame(){
+  const v=validateLevel(E.level);
+  if(v.errs.length){toast('地图不合法：'+v.errs[0]);return;}
+  saveToLib();writeToGameFile([E.level.id]);
+}
+function writeAllToGame(){
+  const ids=Object.keys(LEVELS_LIB).map(Number);
+  if(ids.length===0){toast('关卡库为空');return;}
+  writeToGameFile(ids);
+}
+
+// ============================================================
+//  总渲染 / 初始化
+// ============================================================
+function renderAll(){renderGrid();renderProps();renderStats();renderCellAnalysis();renderDifficulty();document.getElementById('jsonOut').value=JSON.stringify(buildExport(),null,2);renderLib();}
+function init(){
+  setupGrid();libLoad();equipLoad();equipPopulate();
+  // 关卡库缺第2关时,自动以 levels/level_2.json 为准补齐
+  if(!LEVELS_LIB[2]){LEVELS_LIB[2]=JSON.parse(JSON.stringify(LEVEL_SOURCE[2]));libSave();}
+  E.level.path=[{c:4,r:8,t:'start'},{c:4,r:7,t:'gain',v:2},{c:4,r:6,t:'mob',v:6},{c:4,r:5,t:'gain',v:2},{c:4,r:4,t:'boss',v:10}];
+  document.getElementById('fDice').value=4;E.level.dice=4;syncMeta();renderLib();
+}
+init();
+</script>
+</body>
+</html>

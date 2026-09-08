@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>十二生肖棋盘 · 玩法Demo</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{margin:0;font-family:-apple-system,"Segoe UI",system-ui,sans-serif;background:#0b1220;color:#e2e8f0;
+       display:flex;justify-content:center;min-height:100vh;padding:8px 0 16px}
+  #app{width:100%;max-width:460px;padding:8px}
+  h1{font-size:14px;margin:2px 0 6px;text-align:center;color:#64748b;letter-spacing:1px}
+  .stats{display:flex;gap:6px;margin-bottom:6px}
+  .stat{flex:1;background:#1e293b;border-radius:8px;padding:6px 4px;text-align:center}
+  .stat .k{font-size:10px;color:#94a3b8}
+  .stat .v{font-size:18px;font-weight:700}
+  .stat.val .v{color:#60a5fa}.stat.dice .v{color:#fbbf24}.stat.moves .v{color:#34d399}
+  #wrap{position:relative;width:100%;height:460px;background:#020617;border-radius:12px;overflow:hidden;margin-bottom:8px}
+  #board{position:absolute;left:0;top:0;width:100%;height:100%}
+  .wall{position:absolute;width:34px;height:34px;transform:rotate(45deg);background:#1b2839;border:1px solid #2d3e57}
+  .cell{position:absolute;width:38px;height:38px;transform:rotate(45deg);display:flex;align-items:center;justify-content:center;
+        border:1px solid #5b6d8c;cursor:default;transition:none}
+  .cell .inner{transform:rotate(-45deg);text-align:center;font-size:9px;line-height:1.05;color:#cbd5e1;font-weight:700}
+  .cell .inner b{font-size:12px;display:block}
+  .cell.empty{background:#3d4d68}
+  .cell.mob{background:#3b1418;border-color:#7f1d1d}.cell.mob b{color:#fca5a5}
+  .cell.elite{background:#2a1a3a;border-color:#6b21a8}.cell.elite b{color:#d8b4fe}
+  .cell.supply{background:#0f2914;border-color:#15803d}.cell.supply b{color:#86efac}
+  .cell.zodiac{background:#3a2a08;border-color:#b45309}.cell.zodiac b{color:#fcd34d}
+  .cell.boss{background:#3a2a08;border-color:#f59e0b;box-shadow:0 0 8px #f59e0b}.cell.boss b{color:#fde68a;font-size:14px}
+  .cell.resolved{opacity:.35}
+  .cell.resolved::after{content:"✓";position:absolute;color:#34d399;font-size:14px;font-weight:900}
+  .cell.opt{box-shadow:0 0 0 3px #fbbf24,0 0 12px #fbbf24;cursor:pointer;animation:blink 1s infinite}
+  @keyframes blink{50%{box-shadow:0 0 0 3px #f59e0b,0 0 18px #fbbf24}}
+  .player{position:absolute;width:34px;height:34px;border-radius:50%;background:#3b82f6;border:2px solid #fff;
+          display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:900;color:#fff;z-index:50;
+          box-shadow:0 2px 8px rgba(0,0,0,.6);text-align:center;line-height:1.1}
+  .controls{display:flex;gap:6px;margin-bottom:6px}
+  button{flex:1;padding:13px 8px;border:0;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;background:#334155;color:#fff}
+  button:disabled{opacity:.35;cursor:not-allowed}
+  #btnRoll{background:#f59e0b;color:#1f1300;flex:2}
+  #btnReset{flex:0 0 30%;background:#475569}
+  #log{background:#020617;border-radius:8px;padding:7px;font-size:11px;min-height:78px;font-family:Consolas,monospace;color:#94a3b8}
+  #log div{margin:1px 0}#log div:last-child{color:#e2e8f0}
+  .hint{font-size:11px;color:#64748b;background:#1e293b;border-radius:8px;padding:7px;line-height:1.5}
+  .hint b{color:#94a3b8}
+  .die-roll{position:absolute;top:40%;left:50%;transform:translate(-50%,-50%);font-size:72px;font-weight:900;color:#fbbf24;
+            text-shadow:0 4px 20px #000;z-index:60;display:none;pointer-events:none}
+  .die-roll.show{display:block;animation:pop .4s}
+  @keyframes pop{0%{transform:translate(-50%,-50%) scale(.2);opacity:0}60%{transform:translate(-50%,-50%) scale(1.25)}100%{transform:translate(-50%,-50%) scale(1);opacity:1}}
+  #modal{position:fixed;inset:0;background:rgba(0,0,0,.75);display:none;align-items:center;justify-content:center;z-index:99}
+  #modal.show{display:flex}
+  .modal-box{background:#1e293b;border-radius:14px;padding:22px;text-align:center;width:82%;max-width:320px}
+  .modal-box h2{margin:0 0 8px;font-size:22px}
+  .modal-box p{color:#94a3b8;font-size:12px;margin:0 0 14px}
+  .modal-box button{margin:4px 0;width:100%;padding:11px}
+</style>
+</head>
+<body>
+<div id="app">
+  <h1>十二生肖棋盘 · 9×9 大富翁式玩法 Demo</h1>
+  <div class="stats">
+    <div class="stat val"><div class="k">你的数值</div><div class="v" id="statVal">0</div></div>
+    <div class="stat dice"><div class="k">骰子预算</div><div class="v" id="statDice">0</div></div>
+    <div class="stat moves"><div class="k">本轮剩余步数</div><div class="v" id="statMoves">-</div></div>
+  </div>
+  <div id="wrap">
+    <div id="board"></div>
+    <div class="die-roll" id="dieRoll"></div>
+  </div>
+  <div class="controls">
+    <button id="btnRoll" onclick="rollDice()">掷骰子</button>
+    <button id="btnReset" onclick="init()">重来</button>
+  </div>
+  <div id="log"></div>
+  <div class="hint">
+    <b>规则：</b>骰子点数=强制走N格 · 途经不触发只有落点触发 · 到岔路口金色高亮选方向 ·
+    中心Boss格触碰即开战 · 骰子预算用完未达Boss=失败 · 平局玩家胜 · 胜则吸收对方数值 ·
+    <b>策略：</b>外圈游荡打怪成长，从四边十字臂拐进去=承诺打Boss（臂上不能回头）。
+  </div>
+</div>
+<div id="modal"><div class="modal-box" id="modalBox"></div></div>
+
+<script>
+let board, player, diceLeft, movesLeft, lastCellKey, moving, hasDog, status, logArr, pendingOptions;
+
+function $(id){return document.getElementById(id);}
+function key(c,r){return c+","+r;}
+function isWalkable(c,r){return c>=0&&c<9&&r>=0&&r<9&&(c===0||c===8||r===0||r===8||c===4||r===4);}
+function neighbors(c,r){const o=[];for(const [dc,dr] of [[1,0],[-1,0],[0,1],[0,-1]]){const nc=c+dc,nr=r+dr;if(isWalkable(nc,nr))o.push({col:nc,row:nr});}return o;}
+function getCell(c,r){return board[c][r];}
+function setContent(c,r,obj){Object.assign(board[c][r],obj);}
+
+function center(c,r){return {x:230+(c-r)*24, y:30+(c+r)*24};}
+
+function init(){
+  board=[];
+  for(let c=0;c<9;c++){board[c]=[];for(let r=0;r<9;r++)board[c][r]={walkable:isWalkable(c,r),type:"empty",val:0,resolved:false};}
+  setContent(4,4,{type:"boss",val:18});
+  setContent(8,8,{type:"zodiac",zodiac:"dog"});
+  setContent(8,0,{type:"supply"});setContent(0,8,{type:"supply"});setContent(4,8,{type:"supply"});
+  setContent(4,7,{type:"elite",val:8,bonus:"dice",bonusVal:2});
+  const mobs=[[1,0,2],[3,0,3],[5,0,4],[7,0,3],[0,1,2],[0,3,3],[0,5,4],[0,7,3],
+              [2,8,3],[6,8,3],[8,1,3],[8,3,4],[8,5,3],[8,7,4],
+              [4,1,3],[4,3,5],[4,5,4],[1,4,3],[3,4,4],[5,4,4],[7,4,3]];
+  for(const [c,r,v] of mobs) setContent(c,r,{type:"mob",val:v});
+  player={col:0,row:0,val:5};
+  diceLeft=6;movesLeft=0;lastCellKey=null;moving=false;hasDog=false;status="playing";logArr=[];pendingOptions=[];
+  log("进入：9×9生肖棋盘 · 起点(0,0) · Boss在中心(18) · 6骰预算");
+  log("目标：6次掷骰内到中心击败Boss。先在外圈打怪成长，再从十字臂拐进去决战。");
+  render();
+}
+
+function rollDice(){
+  if(status!=="playing"||moving||diceLeft<=0) return;
+  const n=1+Math.floor(Math.random()*6);
+  movesLeft=n;diceLeft--;moving=true;lastCellKey=null;
+  log(`掷骰：${n} 点（剩余骰子${diceLeft}）`);
+  const dr=$("dieRoll");dr.textContent="🎲 "+n;dr.classList.remove("show");void dr.offsetWidth;dr.classList.add("show");
+  setTimeout(()=>{dr.classList.remove("show");doStep();},400);
+}
+
+function doStep(){
+  if(status!=="playing") return;
+  if(movesLeft<=0){land();return;}
+  let opts=neighbors(player.col,player.row);
+  if(lastCellKey!==null) opts=opts.filter(o=>key(o.col,o.row)!==lastCellKey);
+  if(opts.length===0) opts=neighbors(player.col,player.row);
+  if(opts.length===1){advance(opts[0]);}
+  else{pendingOptions=opts;render();}
+}
+
+function pickDirection(c,r){
+  if(!moving||status!=="playing") return;
+  if(!pendingOptions.some(o=>o.col===c&&o.row===r)) return;
+  pendingOptions=[];advance({col:c,row:r});
+}
+
+function advance(to){
+  const target=getCell(to.col,to.row);
+  if(target.type==="boss"){
+    lastCellKey=key(player.col,player.row);
+    player.col=to.col;player.row=to.row;moving=false;movesLeft=0;
+    render();fightBoss();return;
+  }
+  lastCellKey=key(player.col,player.row);
+  player.col=to.col;player.row=to.row;movesLeft--;
+  render();
+  if(movesLeft<=0){land();return;}
+  setTimeout(doStep,300);
+}
+
+function land(){
+  moving=false;
+  const cell=getCell(player.col,player.row);
+  trigger(cell);
+  if(status!=="playing"){render();return;}
+  if(diceLeft<=0){log("骰子耗尽，未达Boss → 失败");status="lost";}
+  render();
+}
+
+function trigger(cell){
+  if(cell.resolved){log("落点已扫荡，空过");return;}
+  if(cell.type==="mob"||cell.type==="elite") fight(cell.val,cell);
+  else if(cell.type==="supply"){diceLeft++;cell.resolved=true;log(`拾取补给：+1骰（预算${diceLeft}）`);}
+  else if(cell.type==="zodiac"){
+    if(cell.zodiac==="dog"){hasDog=true;cell.resolved=true;log("获得【狗】符咒：战斗有效数值 ×1.2");}
+  }
+  else log("落点空格");
+}
+
+function fight(monVal,cell){
+  const eff=hasDog?Math.floor(player.val*1.2):player.val;
+  if(eff>=monVal){
+    player.val+=monVal;cell.resolved=true;
+    log(`战斗胜！有效${eff}≥${monVal}，吸收+${monVal} → 数值${player.val}`);
+    if(cell.type==="elite"&&cell.bonus==="dice"){diceLeft+=cell.bonusVal;log(`精英奖励：+${cell.bonusVal}骰`);}
+  }else{log(`战斗败！有效${eff}<${monVal}，本局结束`);status="lost";}
+}
+
+function fightBoss(){
+  const b=getCell(4,4);const eff=hasDog?Math.floor(player.val*1.2):player.val;
+  if(eff>=b.val){log(`击败Boss！有效${eff}≥${b.val}，通关！`);status="won";}
+  else{log(`Boss战败！有效${eff}<${b.val}`);status="lost";}
+  render();
+}
+
+function cellLabel(cell){
+  if(cell.type==="boss") return `<div class="inner"><b>${cell.val}</b>BOSS</div>`;
+  if(cell.type==="mob") return `<div class="inner"><b>${cell.val}</b>小怪</div>`;
+  if(cell.type==="elite") return `<div class="inner"><b>${cell.val}</b>精英</div>`;
+  if(cell.type==="supply") return `<div class="inner"><b>+1</b>补给</div>`;
+  if(cell.type==="zodiac") return `<div class="inner"><b>狗</b>符咒</div>`;
+  return `<div class="inner">·</div>`;
+}
+
+function render(){
+  $("statVal").textContent=player.val;
+  $("statDice").textContent=diceLeft;
+  $("statMoves").textContent=moving?movesLeft:"-";
+  $("btnRoll").disabled=moving||diceLeft<=0||status!=="playing";
+  let html="";
+  for(let r=0;r<9;r++)for(let c=0;c<9;c++){
+    if(!board[c][r].walkable){const{x,y}=center(c,r);html+=`<div class="wall" style="left:${x-17}px;top:${y-17}px"></div>`;}
+  }
+  for(let r=0;r<9;r++)for(let c=0;c<9;c++){
+    const cell=board[c][r];if(!cell.walkable)continue;
+    const{x,y}=center(c,r);
+    const isOpt=pendingOptions.some(o=>o.col===c&&o.row===r);
+    const cls=["cell",cell.type,cell.resolved?"resolved":"",isOpt?"opt":""].filter(Boolean).join(" ");
+    html+=`<div class="${cls}" style="left:${x-19}px;top:${y-19}px"${isOpt?` onclick="pickDirection(${c},${r})"`:''}>${cellLabel(cell)}</div>`;
+  }
+  const{x,y}=center(player.col,player.row);
+  html+=`<div class="player" style="left:${x-17}px;top:${y-17}px">你<br>${player.val}${hasDog?'🐕':''}</div>`;
+  $("board").innerHTML=html;
+  $("log").innerHTML=logArr.slice(-6).map(l=>`<div>${l}</div>`).join("");
+  const m=$("modal");
+  if(status==="playing"){m.classList.remove("show");return;}
+  const box=$("modalBox");
+  if(status==="won") box.innerHTML=`<h2 style="color:#fbbf24">通关！</h2><p>数值${player.val} · 剩余骰子${diceLeft}${hasDog?' · 已得狗符咒':''}</p><button onclick="init()">再来一局</button>`;
+  else box.innerHTML=`<h2 style="color:#ef4444">失败</h2><p>${logArr[logArr.length-1]||''}</p><button onclick="init()">重试</button>`;
+  m.classList.add("show");
+}
+
+init();
+</script>
+</body>
+</html>

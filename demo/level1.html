@@ -1,0 +1,256 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>十二生肖 · 第1关验证 Demo(走廊版)</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{margin:0;font-family:-apple-system,"Segoe UI",system-ui,sans-serif;background:#0b1220;color:#e2e8f0;
+       display:flex;justify-content:center;min-height:100vh;padding:8px 0 16px}
+  #app{width:100%;max-width:460px;padding:8px}
+  h1{font-size:14px;margin:2px 0 6px;text-align:center;color:#64748b;letter-spacing:1px}
+  .stats{display:flex;gap:6px;margin-bottom:6px}
+  .stat{flex:1;background:#1e293b;border-radius:8px;padding:6px 4px;text-align:center}
+  .stat .k{font-size:10px;color:#94a3b8}
+  .stat .v{font-size:18px;font-weight:700}
+  .s-val .v{color:#60a5fa}.s-dice .v{color:#fbbf24}.s-move .v{color:#34d399}.s-dist .v{color:#f472b6}
+  #wrap{position:relative;width:fit-content;margin:0 auto 8px;background:#020617;border-radius:12px;overflow:hidden}
+  #board{position:relative}
+  .wall{position:absolute;width:32px;height:32px;transform:rotate(45deg);background:#141e30;border:1px solid #243450}
+  .cell{position:absolute;width:38px;height:38px;transform:rotate(45deg);display:flex;align-items:center;justify-content:center;
+        border:1px solid #5b6d8c}
+  .cell .in{transform:rotate(-45deg);text-align:center;font-size:9px;line-height:1.05;color:#cbd5e1;font-weight:700}
+  .cell .in b{font-size:12px;display:block}
+  .cell.start{background:#16283f;border-color:#3b82f6}
+  .cell.gain{background:#0f2914;border-color:#15803d}.cell.gain b{color:#86efac}
+  .cell.mob{background:#3b1418;border-color:#7f1d1d}.cell.mob b{color:#fca5a5}
+  .cell.boss{background:#3a2a08;border-color:#f59e0b;box-shadow:0 0 10px #f59e0b}.cell.boss b{color:#fde68a;font-size:14px}
+  .cell.done{opacity:.35}
+  .cell.done::after{content:"✓";position:absolute;color:#34d399;font-size:14px;font-weight:900}
+  .cell.flash{animation:hit .3s}
+  @keyframes hit{50%{box-shadow:0 0 0 4px #ef4444,0 0 16px #ef4444}}
+  .player{position:absolute;width:34px;height:34px;border-radius:50%;background:#3b82f6;border:2px solid #fff;
+          display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:900;color:#fff;z-index:50;
+          box-shadow:0 2px 8px rgba(0,0,0,.6);transition:left .2s,top .2s}
+  .die{position:absolute;top:38%;left:50%;transform:translate(-50%,-50%);font-size:64px;font-weight:900;color:#fbbf24;
+       text-shadow:0 4px 20px #000;z-index:60;display:none;pointer-events:none}
+  .die.show{display:block;animation:pop .4s}
+  @keyframes pop{0%{transform:translate(-50%,-50%) scale(.2);opacity:0}60%{transform:translate(-50%,-50%) scale(1.25)}100%{transform:translate(-50%,-50%) scale(1);opacity:1}}
+  .float{position:absolute;z-index:55;font-weight:900;font-size:14px;color:#86efac;pointer-events:none;animation:rise .7s forwards}
+  @keyframes rise{to{transform:translateY(-26px);opacity:0}}
+  .controls{display:flex;gap:6px;margin-bottom:6px}
+  button{flex:1;padding:13px 8px;border:0;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;background:#334155;color:#fff}
+  button:disabled{opacity:.35;cursor:not-allowed}
+  #btnRoll{background:#f59e0b;color:#1f1300;flex:2}
+  #btnReset{flex:0 0 30%;background:#475569}
+  #log{background:#020617;border-radius:8px;padding:7px;font-size:11px;min-height:72px;font-family:Consolas,monospace;color:#94a3b8}
+  #log div{margin:1px 0}#log div:last-child{color:#e2e8f0}
+  .hint{font-size:11px;color:#64748b;background:#1e293b;border-radius:8px;padding:7px;line-height:1.5}
+  .hint b{color:#94a3b8}
+  #modal{position:fixed;inset:0;background:rgba(0,0,0,.75);display:none;align-items:center;justify-content:center;z-index:99}
+  #modal.show{display:flex}
+  .mbox{background:#1e293b;border-radius:14px;padding:22px;text-align:center;width:82%;max-width:320px}
+  .mbox h2{margin:0 0 8px;font-size:22px}
+  .mbox p{color:#94a3b8;font-size:12px;margin:0 0 14px;line-height:1.6}
+  .mbox button{width:100%;padding:11px}
+</style>
+</head>
+<body>
+<div id="app">
+  <h1>十二生肖 · 第 1 关验证 Demo(走廊版)</h1>
+  <div class="stats">
+    <div class="stat s-val"><div class="k">你的数值</div><div class="v" id="statVal">-</div></div>
+    <div class="stat s-dice"><div class="k">剩余骰子</div><div class="v" id="statDice">-</div></div>
+    <div class="stat s-move"><div class="k">本轮步数</div><div class="v" id="statMoves">-</div></div>
+    <div class="stat s-dist"><div class="k">距 Boss</div><div class="v" id="statDist">-</div></div>
+  </div>
+  <div id="wrap">
+    <div id="board"></div>
+    <div class="player" id="player">4</div>
+    <div class="die" id="die"></div>
+  </div>
+  <div class="controls">
+    <button id="btnRoll" onclick="roll()">掷骰子</button>
+    <button id="btnReset" onclick="init()">重来</button>
+  </div>
+  <div id="log"></div>
+  <div class="hint">
+    <b>规则:</b>每回合掷 1 颗骰子,强制走满点数;途经绿格 +2 数值;红格是数值门——你的数值 ≥ 它才放行(平局算赢);
+    5 颗骰子内走到终点挑战 Boss(24)。每颗骰子期望 3.5 步,5 颗约 17.5 步——路只有 15 步,但骰子可能不够。
+  </div>
+</div>
+<div id="modal"><div class="mbox" id="mbox"></div></div>
+<script>
+// ====== 关卡数据(以后 AI 批量生成关卡只改这一块)======
+const LEVEL={
+  startVal:4,          // 初始数值(设计缺省值,可调)
+  dice:5,              // 骰子预算(步数张力主杠杆)
+  gain:2,              // 每个普通格 +2
+  path:[               // 蛇形走廊,共 15 步到 Boss
+    {c:0,r:5,t:"start"},
+    {c:1,r:5,t:"gain"},
+    {c:1,r:4,t:"mob",v:6},
+    {c:1,r:3,t:"gain"},
+    {c:1,r:2,t:"gain"},
+    {c:2,r:2,t:"gain"},
+    {c:3,r:2,t:"gain"},
+    {c:4,r:2,t:"gain"},
+    {c:5,r:2,t:"mob",v:16},
+    {c:5,r:3,t:"gain"},
+    {c:5,r:4,t:"gain"},
+    {c:6,r:4,t:"gain"},
+    {c:7,r:4,t:"mob",v:16},
+    {c:8,r:4,t:"gain"},
+    {c:8,r:5,t:"gain"},
+    {c:9,r:5,t:"boss",v:24}
+  ]
+};
+const ABSORB=false;    // 小怪是否吸收数值(false=纯数值门,true=滚雪球模式)
+
+const $=id=>document.getElementById(id);
+const S=27,CELL=38,PAD=10;
+let idx,val,diceLeft,movesLeft,moving,status,logs,doneSet,posMap,lastIdx;
+
+function key(c,r){return c+","+r;}
+function iso(c,r){return {x:(c-r)*S,y:(c+r)*S};}
+function log(t){logs.push(t);}
+
+function init(){
+  idx=0;val=LEVEL.startVal;diceLeft=LEVEL.dice;movesLeft=0;moving=false;
+  status="playing";logs=[];doneSet=new Set();lastIdx=LEVEL.path.length-1;
+  log(`起点(0,5)→ Boss(9,5),共 ${lastIdx} 步 · 骰子 ×${diceLeft}`);
+  log(`初始数值 ${val} · 绿格 +${LEVEL.gain}(途经即收) · 红格数值门`);
+  build();render();
+}
+
+function build(){
+  posMap={};
+  const keys=new Set(LEVEL.path.map(p=>key(p.c,p.r)));
+  let minC=1e9,maxC=-1e9,minR=1e9,maxR=-1e9;
+  LEVEL.path.forEach(p=>{minC=Math.min(minC,p.c);maxC=Math.max(maxC,p.c);minR=Math.min(minR,p.r);maxR=Math.max(maxR,p.r);});
+  const walls=[];
+  for(let c=minC;c<=maxC;c++)for(let r=minR;r<=maxR;r++)if(!keys.has(key(c,r)))walls.push({c,r});
+  let minX=1e9,maxX=-1e9,minY=1e9,maxY=-1e9;
+  LEVEL.path.concat(walls).forEach(p=>{
+    const q=iso(p.c,p.r);
+    minX=Math.min(minX,q.x);maxX=Math.max(maxX,q.x);minY=Math.min(minY,q.y);maxY=Math.max(maxY,q.y);
+  });
+  const bw=maxX-minX+CELL+PAD*2,bh=maxY-minY+CELL+PAD*2;
+  $("wrap").style.width=bw+"px";$("wrap").style.height=bh+"px";
+  $("board").style.width=bw+"px";$("board").style.height=bh+"px";
+  LEVEL.path.concat(walls).forEach(p=>{
+    const q=iso(p.c,p.r);
+    posMap[key(p.c,p.r)]={x:q.x-minX+PAD+CELL/2,y:q.y-minY+PAD+CELL/2};
+  });
+  let html="";
+  walls.forEach(p=>{const q=posMap[key(p.c,p.r)];html+=`<div class="wall" style="left:${q.x-16}px;top:${q.y-16}px"></div>`;});
+  LEVEL.path.forEach((p,i)=>{
+    const q=posMap[key(p.c,p.r)];
+    html+=`<div class="cell ${p.t}" id="cell${i}" style="left:${q.x-CELL/2}px;top:${q.y-CELL/2}px">${label(p)}</div>`;
+  });
+  $("board").innerHTML=html;
+}
+
+function label(p){
+  if(p.t==="boss")return `<div class="in"><b>${p.v}</b>BOSS</div>`;
+  if(p.t==="mob")return `<div class="in"><b>${p.v}</b>小怪</div>`;
+  if(p.t==="gain")return `<div class="in"><b>+${LEVEL.gain}</b></div>`;
+  return `<div class="in">起点</div>`;
+}
+
+function roll(){
+  if(status!=="playing"||moving||diceLeft<=0)return;
+  const n=1+Math.floor(Math.random()*6);
+  diceLeft--;movesLeft=n;moving=true;
+  log(`掷出 ${n} 点(剩 ${diceLeft} 骰)`);
+  const d=$("die");d.textContent="🎲 "+n;d.classList.remove("show");void d.offsetWidth;d.classList.add("show");
+  render();
+  setTimeout(()=>{d.classList.remove("show");step();},420);
+}
+
+function step(){
+  if(status!=="playing")return;
+  if(movesLeft<=0){endTurn();return;}
+  idx++;movesLeft--;
+  const p=LEVEL.path[idx];
+  if(p.t==="gain"){
+    val+=LEVEL.gain;doneSet.add(idx);floatTxt(idx,"+"+LEVEL.gain);
+  }else if(p.t==="mob"){
+    flash(idx);
+    if(val>=p.v){
+      doneSet.add(idx);log(`数值门 ${p.v}:${val} ≥ ${p.v},通过`);
+      if(ABSORB)val+=p.v;
+    }else{
+      render();
+      return endGame(false,`被 ${p.v} 小怪挡住——你的数值只有 ${val}`);
+    }
+  }else if(p.t==="boss"){
+    movesLeft=0;moving=false;
+    if(val>=p.v){render();return endGame(true,`数值 ${val} ≥ Boss ${p.v},通关!`);}
+    render();
+    return endGame(false,`Boss 需要 ${p.v},你只有 ${val}`);
+  }
+  render();
+  if(movesLeft>0)setTimeout(step,230);
+  else setTimeout(endTurn,230);
+}
+
+function endTurn(){
+  moving=false;
+  if(status!=="playing")return;
+  if(idx>=lastIdx)return;
+  if(diceLeft<=0)return endGame(false,`骰子耗尽,距 Boss 还差 ${lastIdx-idx} 步`);
+  log(`停驻第 ${idx} 格 · 数值 ${val} · 距 Boss ${lastIdx-idx} 步`);
+  render();
+}
+
+function endGame(win,reason){
+  status=win?"won":"lost";moving=false;
+  log(reason);
+  render();
+}
+
+function floatTxt(i,txt){
+  const p=LEVEL.path[i],q=posMap[key(p.c,p.r)];
+  const el=document.createElement("div");
+  el.className="float";el.textContent=txt;
+  el.style.left=(q.x-12)+"px";el.style.top=(q.y-24)+"px";
+  $("wrap").appendChild(el);
+  setTimeout(()=>el.remove(),750);
+}
+
+function flash(i){
+  const el=$("cell"+i);if(!el)return;
+  el.classList.remove("flash");void el.offsetWidth;el.classList.add("flash");
+}
+
+function render(){
+  $("statVal").textContent=val;
+  $("statDice").textContent=diceLeft;
+  $("statMoves").textContent=moving?movesLeft:"-";
+  $("statDist").textContent=Math.max(0,lastIdx-idx);
+  $("btnRoll").disabled=moving||diceLeft<=0||status!=="playing";
+  LEVEL.path.forEach((p,i)=>{
+    const el=$("cell"+i);if(!el)return;
+    el.classList.toggle("done",doneSet.has(i));
+  });
+  const cur=LEVEL.path[idx],q=posMap[key(cur.c,cur.r)];
+  const pl=$("player");
+  pl.style.left=(q.x-17)+"px";pl.style.top=(q.y-17)+"px";
+  pl.textContent=val;
+  $("log").innerHTML=logs.slice(-6).map(l=>`<div>${l}</div>`).join("");
+  const m=$("modal");
+  if(status==="playing"){m.classList.remove("show");return;}
+  const box=$("mbox");
+  if(status==="won")
+    box.innerHTML=`<h2 style="color:#fbbf24">通关!</h2><p>${logs[logs.length-1]}<br>剩余骰子 ${diceLeft}</p><button onclick="init()">再来一局</button>`;
+  else
+    box.innerHTML=`<h2 style="color:#ef4444">失败</h2><p>${logs[logs.length-1]}<br>提示:5 颗骰子期望约 17.5 步,通关概率约 78%</p><button onclick="init()">重试</button>`;
+  m.classList.add("show");
+}
+
+init();
+</script>
+</body>
+</html>

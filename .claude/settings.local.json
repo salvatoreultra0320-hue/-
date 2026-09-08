@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(start index.html)",
+      "Bash(node -e ' *)",
+      "Bash(start editor.html)",
+      "Bash(node --check _check.js)",
+      "Bash(node *)",
+      "Bash(sed -i \"s/function T\\(/function tchk\\(/; s/T\\('tchk\\('??/tchk\\('/; \" _smoke.js)",
+      "Bash(sed -i \"s/function T\\(/function tchk\\(/; s/^  T\\('/  tchk\\('/\" _smoke.js)",
+      "Bash(echo \"exit=$?\")",
+      "Bash(echo \"---check exit: $?---\")",
+      "Bash(echo \"EXIT=$?\")",
+      "Skill(update-config)",
+      "Edit(*)",
+      "Write(*)",
+      "Bash(grep -n \"function \\\\$\\\\|#app{\\\\|\\\\.screen{\\\\|\\\\.screen.active\\\\|\\\\.screen.playing\\\\|#toast{\\\\|#toast \" index.html)",
+      "Bash(sed -i 's|  document:{\\\\n||' _smoke.js)",
+      "Bash(python3 -)"
+    ]
+  }
+}

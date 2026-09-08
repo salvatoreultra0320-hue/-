@@ -1,0 +1,885 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>十二生肖 · 骰子爬塔</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{margin:0;font-family:-apple-system,"Segoe UI",system-ui,sans-serif;background:#0b1220;color:#e2e8f0;
+       display:flex;justify-content:center;min-height:100vh;padding:8px 0 16px}
+  #app{width:100%;max-width:460px;padding:8px}
+  .screen{display:none}
+  .screen.active{display:block}
+  /* ===== 主菜单 ===== */
+  .hero{background:linear-gradient(160deg,#1e293b,#0f172a);border:1px solid #243450;border-radius:16px;
+        padding:34px 18px;text-align:center;margin-top:10vh}
+  .logo{font-size:40px;font-weight:900;letter-spacing:4px;
+        background:linear-gradient(90deg,#fbbf24,#f472b6,#60a5fa);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .tagline{margin-top:8px;font-size:12px;color:#94a3b8;letter-spacing:1px}
+  .prog{margin-top:14px;font-size:12px;color:#64748b}
+  .bigbtn{display:block;width:100%;margin-top:18px;padding:15px;border:0;border-radius:12px;font-size:17px;
+          font-weight:900;cursor:pointer;background:#f59e0b;color:#1f1300}
+  .ghostbtn{display:block;width:100%;margin-top:8px;padding:11px;border:1px solid #334155;border-radius:12px;
+            font-size:13px;font-weight:700;cursor:pointer;background:transparent;color:#94a3b8}
+  /* ===== 顶栏 ===== */
+  .topbar{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+  .back{flex:0 0 auto;padding:8px 12px;border:0;border-radius:8px;background:#1e293b;color:#e2e8f0;
+        font-size:13px;font-weight:700;cursor:pointer}
+  .topbar .t{flex:1;text-align:center;font-size:13px;color:#94a3b8;font-weight:700;letter-spacing:1px}
+  .pad{width:56px;flex:0 0 auto}
+  /* ===== 选关 ===== */
+  .lvgrid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+  .lv{aspect-ratio:1;border:1px solid #243450;border-radius:10px;background:#10192a;color:#475569;
+      font-size:15px;font-weight:900;display:flex;flex-direction:column;align-items:center;justify-content:center;
+      gap:2px;cursor:default;padding:0;font-family:inherit}
+  .lv small{font-size:8px;font-weight:700;opacity:.8}
+  .lv.open{background:#16283f;border-color:#3b82f6;color:#e2e8f0;cursor:pointer}
+  .lv.done{background:#0f2914;border-color:#15803d;color:#86efac;cursor:pointer}
+  .lv.locked::after{content:"×";font-size:12px}
+  .lv.bosslv{border-color:#b45309}
+  /* ===== 游戏内统计/控件 ===== */
+  .stats{display:flex;gap:6px;margin-bottom:6px}
+  .stat{flex:1;background:#1e293b;border-radius:8px;padding:6px 4px;text-align:center}
+  .stat .k{font-size:10px;color:#94a3b8}
+  .stat .v{font-size:18px;font-weight:700}
+  .s-val .v{color:#60a5fa}.s-dice .v{color:#fbbf24}.s-move .v{color:#34d399}.s-dist .v{color:#f472b6}
+  #tip{display:none;background:#13233a;border-left:3px solid #3b82f6;padding:7px 9px;border-radius:8px;
+       font-size:11px;color:#93c5fd;margin-bottom:6px;line-height:1.5}
+  #scene{position:relative;width:100%;height:430px;margin:0 auto 8px;border-radius:12px;overflow:hidden;
+         background:linear-gradient(#0e1a2e,#060b16);perspective:950px}
+  #cam{position:absolute;left:0;top:0;transform-style:preserve-3d;transition:transform .32s ease;will-change:transform}
+  .ground{position:absolute;background:#0a1322;border:1px solid #16233a;
+          background-image:linear-gradient(#142036 1px,transparent 1px),linear-gradient(90deg,#142036 1px,transparent 1px);
+          background-size:52px 52px;transform:translateZ(-12px)}
+  .path-layer{position:absolute;left:0;top:0;overflow:visible;pointer-events:none;transform:translateZ(-2px)}
+  .path-layer path{fill:none;stroke:#1f293f;stroke-width:14;stroke-linecap:square;stroke-linejoin:miter}
+  .path-layer path.glow{stroke:#3f5574;stroke-width:6;opacity:.8}
+  .tile{position:absolute;width:44px;height:44px;transform-style:preserve-3d}
+  .tile-shadow{position:absolute;left:3px;right:3px;bottom:-11px;height:18px;background:radial-gradient(ellipse,rgba(0,0,0,.52),transparent 68%);transform:translateZ(-10px)}
+  .tile-side{position:absolute;left:0;right:0;bottom:-10px;height:14px;background:#242d42;border:2px solid #14182b;border-top:0;clip-path:polygon(7% 0,93% 0,100% 100%,0 100%)}
+  .tile-top{position:absolute;inset:0;border:2px solid #14182b;background:linear-gradient(135deg,rgba(255,255,255,.16),rgba(255,255,255,.03) 35%,rgba(0,0,0,.22)),#667086;clip-path:polygon(9% 0,100% 0,91% 100%,0 100%);box-shadow:inset -7px -8px 0 rgba(0,0,0,.14),inset 6px 5px 0 rgba(255,255,255,.08)}
+  .tile-content{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;transform:rotateZ(var(--nrz,0deg)) rotateX(var(--ntx,-58deg)) translateZ(16px)}
+
+  .t-normal .tile-top{background:linear-gradient(135deg,rgba(255,255,255,.18),rgba(0,0,0,.20)),#8c927d}
+  .t-normal .tile-side{background:#464c45}
+  .t-gain .tile-top{background:linear-gradient(135deg,#65d98a,#38b764 55%,#2f9b58)}
+  .t-gain .tile-side{background:#1d713c}
+  .t-mob .tile-top{background:linear-gradient(135deg,#e87584,#b13e53 60%,#7d2638)}
+  .t-mob .tile-side{background:#5b1d2d}
+  .t-boss .tile-top{background:linear-gradient(135deg,#ffe39a,#ffcd75 45%,#b13e53);box-shadow:0 0 18px rgba(255,205,117,.55),inset -8px -9px 0 rgba(20,24,43,.22)}
+  .t-boss .tile-side{background:#6f2638}
+  .t-start .tile-top{background:linear-gradient(135deg,#7fc9ff,#41a6f6 60%,#25649e)}
+  .t-start .tile-side{background:#1f5e98}
+  .t-coin .tile-top{background:linear-gradient(135deg,#ffe9a8,#ffcd75 58%,#d9902f)}
+  .t-coin .tile-side{background:#9a641e}
+  .t-dice .tile-top{background:linear-gradient(135deg,#f4f4f4,#bfc7d8 62%,#8391aa)}
+  .t-dice .tile-side{background:#596277}
+  .t-chest .tile-top{background:linear-gradient(135deg,#d9a35a,#9b5a32 60%,#63311f)}
+  .t-chest .tile-side{background:#4d2618}
+  .t-branch .tile-top{background:linear-gradient(135deg,#a78bfa,#6d4fb1 58%,#3d2a75)}
+  .t-branch .tile-side{background:#2d2158}
+  .lab{position:absolute;left:50%;top:50%;white-space:nowrap;font-weight:900;font-size:13px;color:#e2e8f0;
+       text-shadow:0 1px 4px #000;transform:translate(-50%,-50%) rotateZ(var(--nrz,0deg)) rotateX(var(--ntx,-58deg)) translateZ(10px)}
+  .lab small{display:block;font-size:8px;font-weight:700;text-align:center;opacity:.75}
+  .t-gain .lab{color:#86efac}.t-mob .lab{color:#fca5a5}.t-boss .lab{color:#fde68a;font-size:15px}.t-start .lab{color:#93c5fd}
+  .lab .q{display:none;color:#64748b}
+  .tile.dim{opacity:.25}
+  .tile.dim .v{display:none}
+  .tile.dim .q{display:inline}
+  .tile.done .tile-top{opacity:.52}
+  .tile.done .lab{opacity:.5}
+  .tile.flash .tile-top{animation:hit .3s}
+  @keyframes hit{50%{box-shadow:0 0 0 4px #f4f4f4,0 0 18px #b13e53,inset -7px -8px 0 rgba(0,0,0,.12)}}
+  .tok{position:absolute;width:30px;height:30px;transform-style:preserve-3d}
+  .tok .sh{position:absolute;inset:0;border-radius:50%;background:radial-gradient(ellipse,rgba(0,0,0,.55),transparent 70%);transform:translateZ(2px)}
+  .tokin{position:absolute;inset:-2px;border:2px solid #14182b;display:flex;align-items:center;justify-content:center;
+         font-size:12px;font-weight:900;color:#fff;box-shadow:0 8px 16px rgba(0,0,0,.45);
+         transform:rotateZ(var(--nrz,0deg)) rotateX(var(--ntx,-58deg)) translateZ(30px);clip-path:polygon(50% 0,88% 18%,100% 58%,72% 100%,28% 100%,0 58%,12% 18%)}
+  .tok.jump .tokin{animation:hop .23s ease}
+  .tok.jump .sh{animation:shadowPulse .23s ease}
+  @keyframes hop{50%{transform:rotateZ(var(--nrz,0deg)) rotateX(var(--ntx,-58deg)) translateZ(44px) scale(1.08)}}
+  @keyframes shadowPulse{50%{opacity:.45;transform:translateZ(2px) scale(.82)}}
+  .f3{position:absolute;transform-style:preserve-3d;pointer-events:none}
+  .f3 span{display:block;font-weight:900;font-size:14px;color:#86efac;text-shadow:0 1px 4px #000;animation:rise3 .7s forwards;
+           transform:rotateZ(var(--nrz,0deg)) rotateX(var(--ntx,-58deg)) translateZ(14px)}
+  @keyframes rise3{to{margin-top:-30px;opacity:0}}
+  .die{position:absolute;top:36%;left:50%;transform:translate(-50%,-50%);font-size:56px;font-weight:900;color:#fbbf24;
+       text-shadow:0 4px 20px #000;z-index:60;display:none;pointer-events:none}
+  .die.show{display:block}.die.pop{animation:pop .35s}
+  @keyframes pop{0%{transform:translate(-50%,-50%) scale(.2);opacity:0}60%{transform:translate(-50%,-50%) scale(1.25)}100%{transform:translate(-50%,-50%) scale(1);opacity:1}}
+  #mapWrap{display:none;width:fit-content;margin:0 auto 8px;background:#020617;border-radius:12px;padding:8px}
+  #mapGrid{position:relative}
+  #mapGrid .path-layer{transform:none}
+  .mcell{position:absolute;border:1px solid #2d3e57;display:flex;align-items:center;justify-content:center;
+         font-size:9px;font-weight:700;color:#cbd5e1;text-align:center;line-height:1.05}
+  .mcell.w{background:#10192a;border-color:#1a2740}
+  .mcell.gain{background:#0f2914;color:#86efac;border-color:#15803d}
+  .mcell.mob{background:#3b1418;color:#fca5a5;border-color:#7f1d1d}
+  .mcell.boss{background:#3a2a08;color:#fde68a;border-color:#f59e0b}
+  .mcell.start{background:#16283f;color:#93c5fd;border-color:#3b82f6}
+  .mcell.done{opacity:.35}
+  #p2{position:absolute;width:16px;height:16px;border-radius:50%;background:#3b82f6;border:2px solid #fff;
+      display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:900;z-index:5;
+      transition:left .2s,top .2s}
+  .controls{display:flex;gap:6px;margin-bottom:6px}
+  .controls button{padding:13px 8px;border:0;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;background:#334155;color:#fff}
+  .controls button:disabled{opacity:.35;cursor:not-allowed}
+  #btnRoll{background:#f59e0b;color:#1f1300;flex:2}
+  #btnMap{flex:0 0 24%;background:#1d4ed8;font-size:13px}
+  #btnReset{flex:0 0 24%;background:#475569;font-size:13px}
+  #log{background:#020617;border-radius:8px;padding:7px;font-size:11px;min-height:72px;font-family:Consolas,monospace;color:#94a3b8}
+  #log div{margin:1px 0}#log div:last-child{color:#e2e8f0}
+  .hint{font-size:11px;color:#64748b;background:#1e293b;border-radius:8px;padding:7px;line-height:1.5;margin-top:8px}
+  .hint b{color:#94a3b8}
+  #modal{position:fixed;inset:0;background:rgba(0,0,0,.75);display:none;align-items:center;justify-content:center;z-index:99}
+  #modal.show{display:flex}
+  .mbox{background:#1e293b;border-radius:14px;padding:22px;text-align:center;width:82%;max-width:320px}
+  .mbox h2{margin:0 0 8px;font-size:22px}
+  .mbox p{color:#94a3b8;font-size:12px;margin:0 0 6px;line-height:1.6}
+  .mbox button{width:100%;padding:11px;margin-top:6px;border:0;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;background:#334155;color:#fff}
+  .mbox .pri{background:#f59e0b;color:#1f1300}
+  #toast{position:fixed;left:50%;bottom:40px;transform:translateX(-50%);background:#1e293b;border:1px solid #334155;
+         color:#e2e8f0;padding:9px 16px;border-radius:20px;font-size:12px;opacity:0;transition:opacity .25s;
+         pointer-events:none;z-index:98}
+  #toast.show{opacity:1}
+  /* ===== 低多边形硬核风(8.10 迭代,覆盖上方默认)===== */
+  body{background:#0a0920}
+  .hero{background:linear-gradient(160deg,#1a1638,#0c0a24);border:2px solid #2c2448;
+        box-shadow:0 14px 30px rgba(0,0,0,.55),inset 0 1px 0 rgba(255,255,255,.08)}
+  .logo{font-size:42px;letter-spacing:3px;
+        background:linear-gradient(135deg,#fff5c9 0%,#ffbd4a 35%,#ff6e3f 70%,#b28aff 100%);
+        -webkit-background-clip:text;background-clip:text;color:transparent;
+        filter:drop-shadow(0 3px 10px rgba(255,157,60,.3))}
+  .tagline{color:#8d84b8;letter-spacing:2px}.prog{color:#5b537a}
+  .menuhero{display:flex;justify-content:center;margin-top:22px;filter:drop-shadow(0 12px 22px rgba(0,0,0,.55))}
+  .bigbtn{background:linear-gradient(135deg,#ffd23f 0%,#f5a623 50%,#b8771a 100%);color:#1a1530;border:2px solid #5e3b00;
+          box-shadow:0 5px 0 #5e3b00,0 8px 18px rgba(245,166,35,.35);text-shadow:0 1px 0 rgba(255,255,255,.3)}
+  .bigbtn:active{transform:translateY(3px);box-shadow:0 2px 0 #5e3b00,0 4px 10px rgba(245,166,35,.3)}
+  .ghostbtn{background:linear-gradient(135deg,#2a2350,#1a1638);color:#cfc9f0;border:2px solid #3e3366}
+  .back{background:linear-gradient(135deg,#2a2350,#1a1638);color:#cfc9f0;border:2px solid #3e3366}
+  .controls button{color:#fff;border:2px solid #0e0a1a;box-shadow:0 4px 0 #0e0a1a}
+  .controls button:active{transform:translateY(3px);box-shadow:0 1px 0 #0e0a1a}
+  #btnRoll{background:linear-gradient(135deg,#ffd23f,#f5a623 55%,#b8771a);color:#1a1530;border-color:#5e3b00;box-shadow:0 5px 0 #5e3b00,0 8px 18px rgba(245,166,35,.3)}
+  #btnMap{background:linear-gradient(135deg,#7cdcff,#3a9ad9 55%,#1d5f9c);border-color:#0f3b66;box-shadow:0 4px 0 #0f3b66,0 6px 12px rgba(90,180,255,.3)}
+  #btnReset{background:linear-gradient(135deg,#504a70,#2e2850);border-color:#1a1630;box-shadow:0 4px 0 #1a1630}
+  .topbar .t{color:#8d84b8;letter-spacing:1px}
+  .stat{background:linear-gradient(180deg,#221b40,#15112b);border:2px solid #2c2448;
+        box-shadow:inset 0 1px 0 rgba(255,255,255,.08)}
+  .stat .k{color:#8d84b8;font-size:9px;letter-spacing:1px}
+  .s-dice .v{color:#ffd23f}.s-dist .v{color:#7cdcff}
+  #scene{background:linear-gradient(180deg,#0a081c 0%,#151030 55%,#0f0b24 100%);border:2px solid #2c2448;
+          box-shadow:inset 0 0 60px rgba(0,0,0,.6)}
+  .ground{background:radial-gradient(ellipse at 50% 60%,#1a1638 0%,#0f0b20 100%);border:0;
+          background-image:linear-gradient(#272048 1px,transparent 1px),linear-gradient(90deg,#272048 1px,transparent 1px);
+          background-size:52px 52px;opacity:.65}
+  .tile .face{border:2px solid #0e0a1a;border-radius:0;
+              background:linear-gradient(135deg,rgba(255,255,255,.18) 0%,rgba(255,255,255,.04) 48%,rgba(0,0,0,.08) 52%,rgba(0,0,0,.35) 100%),#3e3660;
+              box-shadow:inset 0 2px 0 rgba(255,255,255,.3),inset 0 -3px 0 rgba(0,0,0,.4),0 3px 8px rgba(0,0,0,.4)}
+  .t-gain .face{background:linear-gradient(135deg,rgba(255,255,255,.20) 0%,rgba(255,255,255,.04) 48%,rgba(0,0,0,.10) 52%,rgba(0,0,0,.35) 100%),#2e9d58}
+  .t-mob .face{background:linear-gradient(135deg,rgba(255,255,255,.18) 0%,rgba(255,255,255,.04) 48%,rgba(0,0,0,.10) 52%,rgba(0,0,0,.35) 100%),#d44058}
+  .t-boss .face{background:linear-gradient(135deg,rgba(255,255,255,.25) 0%,rgba(255,255,255,.05) 48%,rgba(0,0,0,.10) 52%,rgba(0,0,0,.30) 100%),#f5b942;
+               box-shadow:inset 0 2px 0 rgba(255,255,255,.4),inset 0 -3px 0 rgba(0,0,0,.35),0 0 20px rgba(245,185,66,.55)}
+  .t-start .face{background:linear-gradient(135deg,rgba(255,255,255,.20) 0%,rgba(255,255,255,.04) 48%,rgba(0,0,0,.10) 52%,rgba(0,0,0,.35) 100%),#4a90e2}
+  .lab{color:#fff;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:900;
+        text-shadow:0 0 12px currentColor,0 2px 0 #000,0 1px 0 #000}
+  .t-gain .lab{color:#e3fff0}.t-mob .lab{color:#ffe0e6}.t-boss .lab{color:#fff5d0;font-size:17px}.t-start .lab{color:#e0f0ff}
+  .tile.dim{opacity:.25}
+  .gem{display:flex;align-items:center;justify-content:center;width:32px;height:32px;
+        transform:rotate(45deg);border:2px solid #0e0a1a;
+        box-shadow:inset 0 2px 0 rgba(255,255,255,.35),inset 0 -3px 0 rgba(0,0,0,.35)}
+  .gem b{transform:rotate(-45deg);font-size:13px;font-weight:900;color:#fff;text-shadow:0 0 6px rgba(255,255,255,.5),0 1px 0 #000}
+  .gem.gem-mob{background:linear-gradient(135deg,#ff8fa0 0%,#d44058 50%,#7a1f33 100%)}
+  .gem.gem-boss{width:38px;height:38px;background:linear-gradient(135deg,#ffe8a0 0%,#f5b942 50%,#9a6a10 100%);
+               box-shadow:inset 0 2px 0 rgba(255,255,255,.45),inset 0 -3px 0 rgba(0,0,0,.3),0 0 14px rgba(245,185,66,.6)}
+  .gem.gem-boss b{font-size:15px}
+  .gem.gem-hero{background:linear-gradient(135deg,#a5f0ff,#3ea8d8 50%,#1a5a85)}
+  .tok .sh{background:radial-gradient(ellipse,rgba(0,0,0,.6),transparent 70%);opacity:.9}
+  .tokdiamond{width:30px;height:30px;transform:rotate(45deg);border:2px solid #fff;
+              background:linear-gradient(135deg,#a5f0ff,#3ea8d8 50%,#1a5a85);
+              box-shadow:inset 0 2px 0 rgba(255,255,255,.35),0 6px 14px rgba(0,0,0,.5);
+              display:flex;align-items:center;justify-content:center}
+  .tokval{transform:rotate(-45deg);font-size:13px;font-weight:900;color:#fff;
+          text-shadow:0 0 8px #5dd3ff,0 1px 0 #000;margin:0}
+  .die{width:80px;height:80px;
+       background:linear-gradient(135deg,#ffffff 0%,#e6e3f0 48%,#a8a2c8 52%,#6b6490 100%);
+       border:3px solid #0e0a1a;font-size:44px;font-weight:900;color:#1a1530;text-shadow:none;
+       box-shadow:inset 0 2px 0 rgba(255,255,255,.5),inset 0 -4px 0 rgba(0,0,0,.3),0 8px 20px rgba(0,0,0,.5);
+       text-align:center;line-height:80px}
+  .die.pop{animation:pop .4s cubic-bezier(.2,2,.3,1)}
+  @keyframes pop{0%{transform:translate(-50%,-50%) scale(.4)}55%{transform:translate(-50%,-50%) scale(1.15)}100%{transform:translate(-50%,-50%) scale(1)}}
+  .mcell{border:1px solid #1a1630;color:#fff;font-weight:900}
+  .mcell.w{background:#1a1638;border-color:#272048}
+  .mcell.gain{background:#2e9d58;color:#e3fff0}
+  .mcell.mob{background:#d44058;color:#ffe0e6}
+  .mcell.boss{background:#f5b942;color:#1a1530}
+  .mcell.start{background:#4a90e2;color:#e0f0ff}
+  #p2{width:18px;height:18px;transform:rotate(45deg);background:linear-gradient(135deg,#a5f0ff,#1a5a85);
+       border:2px solid #0e0a1a;box-shadow:inset 0 1px 0 rgba(255,255,255,.4),0 0 10px #5dd3ff;
+       display:flex;align-items:center;justify-content:center;z-index:5;color:#fff;font-size:0}
+  #mapWrap,.hint{background:linear-gradient(180deg,#221b40,#15112b);border:2px solid #2c2448}
+  .hint{color:#8d84b8}.hint b{color:#cfc9f0}
+  .mbox{background:linear-gradient(160deg,#2a2350,#15112b);border:2px solid #2c2448;
+        box-shadow:0 16px 40px rgba(0,0,0,.65)}
+  .lv{border:2px solid #2c2448;background:linear-gradient(180deg,#221b40,#15112b);color:#5b537a;
+       box-shadow:inset 0 1px 0 rgba(255,255,255,.06)}
+  .lv.open{background:linear-gradient(180deg,#302858,#1d1838);color:#e0dcff;border-color:#5dd3ff;box-shadow:inset 0 1px 0 rgba(255,255,255,.12),0 0 12px rgba(93,211,255,.3)}
+  .lv.done{background:linear-gradient(180deg,#1a3b28,#0d2419);color:#5fe0a0;border-color:#3fb56b;box-shadow:inset 0 1px 0 rgba(255,255,255,.1)}
+  .lv.bosslv{border-color:#f5b942;box-shadow:inset 0 1px 0 rgba(255,255,255,.1),0 0 8px rgba(245,185,66,.3)}
+  #toast{background:linear-gradient(180deg,#2a2350,#1d1838);border:2px solid #3e3366;
+         color:#e0dcff;box-shadow:0 6px 18px rgba(0,0,0,.5)}
+  #modal{position:fixed;inset:0;background:rgba(0,0,0,.78);display:none;align-items:center;justify-content:center;z-index:99}
+  .mcell{border:1px solid #1a1530;color:#fff}
+  .mcell.w{background:#100d28;border-color:#1e1a3c}
+  .mcell.gain{background:#3fb56b;color:#0f2417}
+  .mcell.mob{background:#e0556b;color:#fff}
+  .mcell.boss{background:#f5b942;color:#1a1530}
+  .mcell.start{background:#4a90e2;color:#fff}
+  .mcell.coin{background:#ffcd75;color:#1a1530}
+  .mcell.dice{background:#f4f4f4;color:#14182b}
+  .mcell.chest{background:#9b5a32;color:#ffcd75}
+  .mcell.branch{background:#6d4fb1;color:#f4f4f4}
+  #p2{background:#5dd3ff;border:2px solid #1a1530;color:#1a1530;box-shadow:0 0 8px #5dd3ff}
+  #mapWrap,.hint{background:#100d28;border:2px solid #2e2750}
+  .hint{color:#9d96c4}.hint b{color:#cfc9f0}
+  .mbox{background:#241f44;border:2px solid #2e2750;box-shadow:0 14px 36px rgba(0,0,0,.55)}
+  .lv{border:2px solid #2e2750;background:#1e1a3c;color:#5a5278}
+  .lv.open{background:#241f44;color:#cfc9f0;border-color:#5dd3ff}
+  .lv.done{background:#1d3b2a;color:#3fb56b;border-color:#3fb56b}
+  .lv.bosslv{border-color:#f5b942}
+  #toast{background:#241f44;border:2px solid #3a3360}
+  .ico{position:relative;display:inline-block}
+  .ico.coin{width:24px;height:24px;border:3px solid #8b5a18;background:linear-gradient(135deg,#fff0a3,#ffcd75 48%,#b97822);clip-path:polygon(50% 0,86% 15%,100% 50%,84% 86%,50% 100%,15% 86%,0 50%,15% 15%)}
+  .ico.coin::after{content:"";position:absolute;inset:6px;border:2px solid #8b5a18;clip-path:inherit;background:rgba(255,255,255,.2)}
+  .ico.dice{width:25px;height:25px;background:linear-gradient(135deg,#fff,#d9dce8 58%,#8b94aa);border:2px solid #14182b;clip-path:polygon(11% 0,100% 0,89% 100%,0 100%)}
+  .ico.dice::before{content:"";position:absolute;left:6px;top:6px;width:4px;height:4px;background:#14182b;box-shadow:9px 4px 0 #14182b,4px 12px 0 #14182b;border-radius:50%}
+  .die{display:none;align-items:center;justify-content:center;gap:6px;line-height:1}
+  .die.show{display:flex}
+  .die .ico.dice{width:34px;height:34px}
+  .ico.chest{width:28px;height:22px;background:linear-gradient(135deg,#d49a4e,#854625 60%,#5a2816);border:2px solid #14182b;clip-path:polygon(8% 18%,92% 18%,100% 100%,0 100%)}
+  .ico.chest::before{content:"";position:absolute;left:4px;right:4px;top:1px;height:9px;background:#f0b962;border:2px solid #14182b;clip-path:polygon(12% 0,88% 0,100% 100%,0 100%)}
+  .ico.chest::after{content:"";position:absolute;left:11px;top:9px;width:6px;height:7px;background:#ffcd75;border:2px solid #14182b}
+  .node-text{font-weight:900;font-size:16px;color:#f4f4f4;text-shadow:0 2px 0 #14182b,0 0 8px rgba(0,0,0,.8)}
+  .enemy,.bossmark{display:flex;flex-direction:column;align-items:center;gap:1px}
+  .bossmark .poly{width:31px!important;height:31px!important}
+  .branchmark{width:26px;height:26px;border:2px solid #14182b;background:linear-gradient(135deg,#d4c4ff,#6d4fb1);clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%);position:relative}
+  .branchmark::before,.branchmark::after{content:"";position:absolute;background:#14182b;width:12px;height:3px;top:11px}
+  .branchmark::before{left:2px;transform:rotate(-35deg)}.branchmark::after{right:2px;transform:rotate(35deg)}
+
+  /* ===== poly 精灵背景 ===== */
+  .poly{position:relative;display:inline-block}
+  .p-mob{background:linear-gradient(135deg,#3a3040,#1a1520);border:2px solid #000;clip-path:polygon(15% 20%,32% 0,50% 18%,68% 0,85% 20%,100% 60%,78% 100%,22% 100%,0 60%);box-shadow:0 3px 6px rgba(0,0,0,.5)}
+  .p-mob::before,.p-mob::after{content:"";position:absolute;width:22%;height:22%;background:#ff3b3b;border-radius:50%;top:38%;box-shadow:0 0 4px #ff3b3b}
+  .p-mob::before{left:18%}.p-mob::after{right:18%}
+  .p-boss{background:linear-gradient(135deg,#e89838,#b86614);border:2px solid #4a2704;clip-path:polygon(15% 16%,34% 0,50% 20%,66% 0,85% 16%,100% 58%,72% 100%,28% 100%,0 58%);box-shadow:0 4px 8px rgba(0,0,0,.4)}
+  .p-boss::before{content:"";position:absolute;bottom:0;left:15%;right:15%;height:45%;background:#fff3e0;border-radius:0 0 30% 30%}
+  .p-boss::after{content:"";position:absolute;bottom:-4px;left:10%;right:10%;height:18%;background:#e03232;border-radius:4px}
+  .p-hero{background:linear-gradient(135deg,#e69d2b,#b56c10);border:2px solid #1a2230;clip-path:polygon(50% 0,85% 25%,100% 60%,75% 100%,25% 100%,0 60%,15% 25%);box-shadow:0 4px 8px rgba(0,0,0,.4)}
+  .p-hero::before{content:"";position:absolute;top:0;left:20%;right:20%;height:40%;background:linear-gradient(135deg,#dddeda,#9da2ad);clip-path:polygon(50% 0,100% 100%,0 100%)}
+  .p-hero::after{content:"";position:absolute;top:35%;left:15%;right:15%;height:25%;background:#d93838;border-radius:2px}
+
+  /* ===== 参考图方向：2.5D 小岛棋盘皮肤 ===== */
+  body{background:
+    radial-gradient(circle at 50% -10%,rgba(65,166,246,.18),transparent 38%),
+    linear-gradient(180deg,#07111f 0%,#0b1727 48%,#060913 100%);
+    color:#f4f4f4;padding:6px 0 12px}
+  #app{max-width:460px;padding:6px 8px}
+  .topbar{height:48px;margin-bottom:6px;align-items:center}
+  .gamehud .t{font-size:20px;color:#efe8d8;text-shadow:0 2px 0 #07111f,0 0 10px rgba(255,205,117,.2);letter-spacing:1px}
+  .gamehud .t::before,.gamehud .t::after{content:"◆";font-size:13px;color:#ffcd75;margin:0 10px;text-shadow:0 2px 0 #4e3311}
+  .back,.coinbag,.stat,.controls button,.mbox,.lv,.hero,.hint{border-radius:6px;clip-path:polygon(8px 0,calc(100% - 8px) 0,100% 8px,100% calc(100% - 8px),calc(100% - 8px) 100%,8px 100%,0 calc(100% - 8px),0 8px)}
+  .back{min-width:82px;height:40px;background:linear-gradient(#3b4655,#202936);border:2px solid #0b1220;color:#f4f4f4;box-shadow:inset 0 2px 0 rgba(255,255,255,.15),0 4px 0 #111827,0 8px 16px rgba(0,0,0,.35);font-size:17px}
+  .coinbag{width:92px;height:40px;display:flex;align-items:center;justify-content:center;gap:8px;background:linear-gradient(#213145,#111c2c);border:2px solid #334257;box-shadow:inset 0 2px 0 rgba(255,255,255,.12),0 4px 0 #09101d;font-size:18px;color:#e6edf6}
+  .mini-coin{display:inline-block;width:22px;height:22px;border:3px solid #9b641d;background:linear-gradient(135deg,#fff2a8,#ffcd75 52%,#c47a20);border-radius:50%;box-shadow:inset 0 -3px 0 rgba(0,0,0,.18)}
+  .mini-coin::after{content:"";display:block;width:8px;height:8px;margin:4px auto;border:2px solid #9b641d;border-radius:50%}
+  .stats{gap:14px;margin:8px auto 6px;width:78%}
+  .stat{min-height:70px;display:flex;align-items:center;justify-content:center;gap:14px;padding:8px 12px;background:linear-gradient(180deg,#1c2b3d,#101b2b);border:2px solid #2e3d51;box-shadow:inset 0 2px 0 rgba(255,255,255,.1),0 5px 0 #08101c,0 10px 18px rgba(0,0,0,.35);text-align:left}
+  .stat .k{font-size:14px;color:#b9c2cd;font-weight:800;white-space:nowrap;text-shadow:0 1px 0 #050913}
+  .stat .v{font-size:34px;line-height:1;font-weight:950;text-shadow:0 3px 0 #111827,0 0 12px rgba(0,0,0,.5)}
+  .s-dice .v{color:#ffcd75}.s-dist .v{color:#ff725c}
+  .statIcon{flex:0 0 auto}
+  .mini-dice{position:relative;display:inline-block;width:36px;height:36px;background:linear-gradient(135deg,#fff,#dddcca 58%,#8a8f99);border:2px solid #243042;clip-path:polygon(12% 0,100% 0,88% 100%,0 100%);box-shadow:inset -5px -5px 0 rgba(0,0,0,.16),0 4px 0 rgba(0,0,0,.25)}
+  .mini-dice::before{content:"";position:absolute;left:8px;top:8px;width:5px;height:5px;background:#273241;border-radius:50%;box-shadow:13px 4px 0 #273241,5px 17px 0 #273241}
+  .mini-flag{position:relative;width:34px;height:40px;display:inline-block}
+  .mini-flag::before{content:"";position:absolute;left:8px;top:4px;width:4px;height:31px;background:#b9822d;border:1px solid #5c3713}
+  .mini-flag::after{content:"";position:absolute;left:12px;top:6px;width:22px;height:16px;background:linear-gradient(135deg,#ff725c,#c23e38);clip-path:polygon(0 0,100% 18%,72% 55%,100% 100%,0 82%)}
+  #scene{height:560px;border:0;border-radius:12px;background:
+    radial-gradient(circle at 2% 40%,rgba(60,160,255,.5),transparent 22%),
+    radial-gradient(circle at 98% 42%,rgba(60,160,255,.45),transparent 22%),
+    radial-gradient(circle at 50% 95%,rgba(20,40,60,.9),transparent 40%),
+    linear-gradient(180deg,#06101e 0%,#0a1828 55%,#040810 100%);perspective:980px;overflow:hidden;box-shadow:none}
+  #scene::before{content:"";position:absolute;inset:20px 15px 10px;border-radius:32px;background:radial-gradient(ellipse at center,rgba(77,189,98,.12),transparent 55%);filter:blur(10px);pointer-events:none;z-index:1}
+  .ground{border:0;border-radius:12px;background:#4a6830!important;background-image:none!important;
+    box-shadow:0 14px 0 #556e3a,0 20px 0 #5a4530,0 28px 0 #3d2e1e,0 36px 0 #2a1e14,0 44px 30px rgba(0,0,0,.7);
+    transform:translateZ(-14px)}
+  .terrain-cell{position:absolute;width:52px;height:52px;background:linear-gradient(135deg,#6f8f3c,#4f7531 62%,#3d5e29);border:1px solid rgba(28,49,24,.55);box-shadow:inset 5px 5px 0 rgba(255,255,255,.09),inset -6px -8px 0 rgba(0,0,0,.1);transform:translateZ(-8px)}
+  .terrain-cell.alt{background:linear-gradient(135deg,#7ea24b,#557d35 60%,#44682d)}
+  .decor{position:absolute;pointer-events:none;transform-style:preserve-3d;z-index:1}
+  .tree{width:34px;height:50px}
+  .tree::before{content:"";position:absolute;left:12px;bottom:2px;width:9px;height:20px;background:#6b421f;border:2px solid #332112;clip-path:polygon(25% 0,75% 0,100% 100%,0 100%)}
+  .tree::after{content:"";position:absolute;left:1px;top:0;width:32px;height:36px;background:linear-gradient(135deg,#9dbd3e,#5d8b2e 55%,#2e5a23);border:2px solid #2a4620;clip-path:polygon(50% 0,88% 35%,70% 38%,100% 80%,58% 72%,50% 100%,42% 72%,0 80%,30% 38%,12% 35%)}
+  .rock{width:28px;height:22px;background:linear-gradient(135deg,#c3c0ad,#85887c 58%,#5d625c);border:2px solid #4b504a;clip-path:polygon(32% 0,75% 8%,100% 48%,78% 100%,22% 92%,0 54%);box-shadow:0 7px 0 rgba(0,0,0,.18)}
+  .flower{width:18px;height:14px}
+  .flower::before{content:"";position:absolute;left:7px;top:5px;width:5px;height:5px;background:#ffcd75;border-radius:50%;box-shadow:-6px 0 0 #f4f4f4,6px 0 0 #f4f4f4,0 -5px 0 #f4f4f4,0 5px 0 #f4f4f4}
+  .fence{width:34px;height:18px;border-left:4px solid #6b421f;border-right:4px solid #6b421f}
+  .fence::before,.fence::after{content:"";position:absolute;left:0;right:0;height:4px;background:#8b5b27}.fence::before{top:3px}.fence::after{bottom:3px}
+  .path-layer{z-index:3;transform:translateZ(0)}
+  .path-layer path{stroke:#8b6a35;stroke-width:16;opacity:.7}
+  .path-layer path.glow{stroke:#e7c887;stroke-width:9;opacity:.95}
+  .tile{z-index:6;width:50px;height:50px}
+  .tile-shadow{bottom:-16px;height:22px;background:radial-gradient(ellipse,rgba(0,0,0,.5),transparent 70%)}
+  .tile-side{bottom:-15px;height:20px;border-color:#5f3f21;background:linear-gradient(180deg,#c0924e,#8a6030);border-width:2px}
+  .tile-top{border-color:#7d5a2d;border-width:2px;border-radius:4px;background:linear-gradient(135deg,#f3dca9,#d7b873 60%,#b88c4d);clip-path:none;box-shadow:inset 5px 4px 0 rgba(255,255,255,.22),inset -5px -6px 0 rgba(95,63,33,.2)}
+  .t-normal .tile-top{background:linear-gradient(135deg,#f0d7a6,#d6b878 62%,#b78c4c);border-color:#8b6a35}.t-normal .tile-side{background:#a8743e}
+  .t-start .tile-top,.t-dice .tile-top{background:linear-gradient(135deg,#6dbcf7,#2779c7 62%,#18528e);border-color:#144778}.t-start .tile-side,.t-dice .tile-side{background:#13416f}
+  .t-gain .tile-top{background:linear-gradient(135deg,#70da86,#38b764 58%,#238547);border-color:#1e6b37}.t-gain .tile-side{background:#1d713c}
+  .t-mob .tile-top{background:linear-gradient(135deg,#ee806f,#b13e53 58%,#702637);border-color:#61222f}.t-mob .tile-side{background:#642436}
+  .t-boss .tile-top{background:linear-gradient(135deg,#ffdd83,#c94547 48%,#62264d);border-color:#4c203d;box-shadow:0 0 20px rgba(255,205,117,.45),inset -8px -9px 0 rgba(20,24,43,.18)}
+  .t-boss .tile-side{background:#4b1e38}
+  .t-coin .tile-top{background:linear-gradient(135deg,#ffe79b,#ffbd38 58%,#c98221);border-color:#8b5a18}.t-coin .tile-side{background:#9a641e}
+  .t-chest .tile-top,.t-branch .tile-top{background:linear-gradient(135deg,#b795ff,#7742b8 58%,#45256f);border-color:#39215d}.t-chest .tile-side,.t-branch .tile-side{background:#321b54}
+  .tile-content{transform:rotateZ(var(--nrz,0deg)) rotateX(var(--ntx,-58deg)) translateZ(24px)}
+  .lab{font-size:20px;text-shadow:0 2px 0 rgba(0,0,0,.7),0 0 10px rgba(0,0,0,.6);line-height:1}
+  .node-text{font-size:24px;font-weight:950;text-shadow:0 2px 0 rgba(0,0,0,.8),0 0 8px rgba(0,0,0,.6)}
+  .enemy{gap:2px}.enemy .poly{width:26px!important;height:24px!important}
+  .bossmark{gap:2px}.bossmark .poly{width:36px!important;height:34px!important}
+  .ico.coin{width:28px;height:28px}.ico.dice{width:28px;height:28px}.ico.chest{width:30px;height:24px}
+  .tok{width:42px;height:54px;z-index:8}
+  .tok .sh{top:34px;left:2px;right:2px;height:16px}
+  .tokin{inset:0;clip-path:polygon(50% 0,78% 14%,91% 42%,82% 78%,50% 100%,18% 78%,9% 42%,22% 14%);background:linear-gradient(135deg,#f5dfb8 0 22%,#d24d3e 23% 46%,#f0a33a 47% 72%,#475166 73%);border-color:#293344;box-shadow:0 7px 0 rgba(0,0,0,.28),0 14px 16px rgba(0,0,0,.35)}
+  .tokin::before{content:"";position:absolute;left:11px;top:5px;width:20px;height:17px;background:linear-gradient(135deg,#eef1e2,#929b9c);border:2px solid #293344;clip-path:polygon(50% 0,90% 28%,78% 100%,22% 100%,10% 28%)}
+  .tokval{position:absolute;bottom:6px;font-size:14px;color:#fff}
+  .controls{height:68px;gap:12px;margin-top:6px}
+  .controls button{min-height:60px;border:2px solid rgba(0,0,0,.35);border-radius:6px;font-size:20px;font-weight:950;display:flex;align-items:center;justify-content:center;gap:10px;box-shadow:inset 0 3px 0 rgba(255,255,255,.18),0 5px 0 rgba(0,0,0,.35),0 10px 18px rgba(0,0,0,.3)}
+  #btnMap{flex:1;background:linear-gradient(#3d82d8,#225da7)}
+  #btnRoll{flex:1.55;background:linear-gradient(#ffc94c,#e59a12);color:#fff;text-shadow:0 2px 0 #8a5a12;flex-direction:column;gap:0}
+  #btnRoll .mini-dice{position:absolute;left:20px;width:42px;height:42px}
+  #btnRoll span:not(.btnIcon){padding-left:44px}
+  #btnRoll small{font-size:12px;color:#fff2d1;text-shadow:0 1px 0 #8a5a12;padding-left:44px}
+  #btnReset{flex:1;background:linear-gradient(#4b5563,#252f3d)}
+  .btnIcon{width:32px;height:32px;display:inline-block;flex:0 0 auto}
+  .mapIcon{background:linear-gradient(90deg,#e9f1ff 0 28%,transparent 28% 36%,#e9f1ff 36% 64%,transparent 64% 72%,#e9f1ff 72%);clip-path:polygon(0 12%,28% 0,36% 12%,64% 0,72% 12%,100% 0,100% 88%,72% 100%,64% 88%,36% 100%,28% 88%,0 100%)}
+  .resetIcon{position:relative;border:5px solid #d9dee7;border-left-color:transparent;border-radius:50%}
+  .resetIcon::after{content:"";position:absolute;right:-4px;top:0;border-left:10px solid #d9dee7;border-top:7px solid transparent;border-bottom:7px solid transparent}
+  #mapWrap{background:linear-gradient(#1c2b3d,#101b2b);border:2px solid #2e3d51;box-shadow:0 5px 0 #08101c;padding:10px}
+  .mcell.w{background:linear-gradient(135deg,#66883e,#416329);border-color:#284421;opacity:.72}
+  .mcell{font-size:14px;font-weight:950;border-width:2px;box-shadow:inset 2px 2px 0 rgba(255,255,255,.12)}
+  @media (max-width:390px){
+    .stats{width:88%;gap:8px}.stat{gap:8px;padding:8px}.stat .k{font-size:12px}.stat .v{font-size:30px}
+    #scene{height:500px}.controls{gap:8px}.controls button{font-size:17px}
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="screen active" id="screenMenu">
+    <div class="hero">
+      <div class="logo">十二生肖</div>
+      <div class="tagline">骰子 × 数值对撞 · 50 关爬塔</div>
+      <div class="menuhero" id="menuHero"></div>
+      <div class="prog" id="menuProg"></div>
+      <button class="bigbtn" onclick="goLevels()">开始游戏</button>
+      <button class="ghostbtn" onclick="toggleHowto()">玩法说明</button>
+      <div class="hint" id="howto" style="display:none">掷骰子,棋子强制走满点数;途经绿格 +2 数值;红格是数值门——你的数值 ≥ 它才放行,平局算赢;骰子用完前走到 Boss 格,数值 ≥ Boss 即通关。3D 视角只能看清前方 6 格,点「地图」看全盘。</div>
+    </div>
+  </div>
+  <div class="screen" id="screenLevels">
+    <div class="topbar"><button class="back" onclick="goMenu()">‹ 主页</button><div class="t">选择关卡 · 共 50 关</div><div class="pad"></div></div>
+    <div class="lvgrid" id="lvgrid"></div>
+    <div class="hint">金色边框 = 生肖 Boss 关(第 3 / 6 / 10 / 14…关)。通关当前关即解锁下一关。</div>
+  </div>
+  <div class="screen" id="screenGame">
+    <div class="topbar gamehud"><button class="back" onclick="goLevels()">‹ 选关</button><div class="t" id="gameTitle">-</div><div class="coinbag"><span class="mini-coin"></span><b>358</b></div></div>
+    <div class="stats">
+
+      <div class="stat s-dice"><div class="statIcon mini-dice"></div><div><div class="k">剩余骰子</div><div class="v" id="statDice">-</div></div></div>
+
+      <div class="stat s-dist"><div class="statIcon mini-flag"></div><div><div class="k">距 Boss 最短步数</div><div class="v" id="statDist">-</div></div></div>
+    </div>
+
+    <div id="scene"><div id="cam"></div><div class="die" id="die"></div></div>
+    <div id="mapWrap"><div id="mapGrid"></div></div>
+    <div class="controls">
+      <button id="btnMap" onclick="toggleView()"><span class="btnIcon mapIcon"></span>地图</button>
+      <button id="btnRoll" onclick="roll()"><span class="btnIcon mini-dice"></span><span>掷骰子</span><small>消耗 1 个骰子</small></button>
+      <button id="btnReset" onclick="startLevel(LEVEL)"><span class="btnIcon resetIcon"></span>重新开始</button>
+    </div>
+
+  </div>
+
+</div>
+<div id="modal"><div class="mbox" id="mbox"></div></div>
+<div id="toast"></div>
+<script>
+// ====== 关卡库(AI 批量生成时往这里追加)======
+const LEVELS=[
+  { id:1, name:"新手教程", sub:"丢骰子 · 比大小", tutorial:true,
+    size:9,startVal:4, dice:5, gain:2,
+    path:[
+      {id:0,c:4,r:8,t:"start",next:[1]},
+      {id:1,c:4,r:7,t:"normal",next:[2]},
+      {id:2,c:4,r:6,t:"coin",next:[3]},
+      {id:3,c:4,r:5,t:"mob",v:6,next:[4]},
+      {id:4,c:4,r:4,t:"gain",next:[5]},
+      {id:5,c:4,r:3,t:"branch",branches:[6,11],next:[6,11]},
+      {id:6,c:3,r:3,t:"chest",branchId:"A",next:[7]},
+      {id:7,c:2,r:3,t:"dice",branchId:"A",next:[8]},
+      {id:8,c:2,r:2,t:"mob",v:8,branchId:"A",next:[9]},
+      {id:9,c:3,r:2,t:"normal",branchId:"A",next:[10]},
+      {id:10,c:4,r:2,t:"gain",branchId:"A",next:[18]},
+      {id:11,c:5,r:3,t:"mob",v:7,branchId:"B",next:[12]},
+      {id:12,c:6,r:3,t:"gain",branchId:"B",next:[13]},
+      {id:13,c:7,r:3,t:"chest",branchId:"B",next:[14]},
+      {id:14,c:7,r:2,t:"coin",branchId:"B",next:[15]},
+      {id:15,c:6,r:2,t:"mob",v:11,branchId:"B",next:[16]},
+      {id:16,c:6,r:1,t:"dice",branchId:"B",next:[17]},
+      {id:17,c:5,r:1,t:"normal",branchId:"B",next:[18]},
+      {id:18,c:4,r:1,t:"normal",next:[19]},
+      {id:19,c:4,r:0,t:"boss",v:16}
+    ]},
+  { id:2, name:"蛇形走廊", sub:"数值门三连", tutorial:false,
+    size:9,startVal:4, dice:5, gain:2,
+    path:[
+      {c:0,r:5,t:"start"},
+      {c:1,r:5,t:"gain"},
+      {c:1,r:4,t:"mob",v:6},
+      {c:1,r:3,t:"gain"},
+      {c:1,r:2,t:"coin"},
+      {c:2,r:2,t:"gain"},
+      {c:3,r:2,t:"chest"},
+      {c:4,r:2,t:"gain"},
+      {c:5,r:2,t:"mob",v:16},
+      {c:5,r:3,t:"dice"},
+      {c:5,r:4,t:"gain"},
+      {c:6,r:4,t:"gain"},
+      {c:7,r:4,t:"mob",v:16},
+      {c:8,r:4,t:"gain"},
+      {c:8,r:5,t:"normal"},
+      {c:8,r:6,t:"boss",v:24}
+    ]}
+];
+const BOSS_LV=[3,6,10,14,18,22,26,30,34,38,42,46,50];
+// ====== AI 关卡生成器 v1(骨架):参数表 → 随机走造形 → 数值填配,难度用骰子和分布反解 ======
+const ZOD=["狗","鼠","牛","虎","兔","龙","蛇","马","羊","猴","鸡","猪"];
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+function diceDist(n){let d=[1];for(let i=0;i<n;i++){const nd=new Array(d.length+6).fill(0);for(let s=0;s<d.length;s++)if(d[s])for(let f=1;f<=6;f++)nd[s+f]+=d[s];d=nd;}return d;}
+// 难度平面:目标胜率平滑下行(0.90→0.52) + 硬约束(胜率不升/步数不缩/骰子不减),逐关贪心搜索 (D6,P)
+const PLAN=(()=>{
+  const plan={1:{D6:4,P:9,wr:0.946},2:{D6:5,P:15,wr:0.779}};
+  let prevWr=0.779,prevP=15,prevD6=5;
+  for(let id=3;id<=50;id++){
+    const target=0.90-(id-3)*(0.38/47);
+    let best=null;
+    for(let D6=prevD6;D6<=Math.min(9,prevD6+1);D6++){
+      const dist=diceDist(D6),total=Math.pow(6,D6);
+      for(let P=Math.max(prevP,D6);P<=Math.min(6*D6,40);P++){
+        let ge=0;for(let s=P;s<=6*D6;s++)ge+=dist[s];
+        const wr=ge/total;
+        if(wr>prevWr+0.004)continue;
+        const score=Math.abs(wr-target)+(P-prevP)*0.0008;
+        if(!best||score<best.score)best={D6:D6,P:P,wr:wr,score:score};
+      }
+    }
+    if(!best)best={D6:prevD6,P:Math.min(prevP+1,6*prevD6),wr:0};
+    plan[id]=best;prevWr=best.wr;prevP=best.P;prevD6=best.D6;
+  }
+  return plan;
+})();
+function genPath(rng,P,shape){
+  const DIRS=[[1,0],[0,1],[-1,0],[0,-1]],seen=new Set();
+  let c=Math.floor(rng()*GRID_SIZE),r=Math.floor(rng()*GRID_SIZE),dir=Math.floor(rng()*4);
+  const cells=[[c,r]];seen.add(c+","+r);
+  const contW=shape===1?9:shape===2?5:3.5,turnR=shape===3;
+  for(let step=0;step<P;step++){
+    const cand=[];
+    for(let d=0;d<4;d++){
+      const nc=c+DIRS[d][0],nr=r+DIRS[d][1];
+      if(nc<0||nc>=GRID_SIZE||nr<0||nr>=GRID_SIZE||seen.has(nc+","+nr))continue;
+      let w=1;if(d===dir)w=contW;else if(d===(dir+(turnR?1:(rng()<0.5?1:3)))%4)w=2.5;
+      cand.push([nc,nr,d,w]);
+    }
+    if(!cand.length)return null;
+    let tot=0;for(const x of cand)tot+=x[3];
+    let pick=rng()*tot,chosen=cand[0];
+    for(const x of cand){pick-=x[3];if(pick<=0){chosen=x;break;}}
+    c=chosen[0];r=chosen[1];dir=chosen[2];cells.push([c,r]);seen.add(c+","+r);
+  }
+  return cells;
+}
+function genLevel(id){
+  const rng=mulberry32(id*7919+13);
+  const plan=PLAN[id],D6=plan.D6,P=plan.P;
+  const shape=id<=10?1:id<=20?2:(id%3)+1;
+
+  let cells=null;
+  for(let a=0;a<400&&!cells;a++)cells=genPath(rng,P,shape);
+  if(!cells){cells=[];for(let i=0;i<=P;i++)cells.push([i%GRID_SIZE,Math.floor(i/GRID_SIZE)]);}
+  const gainV=id<=20?2:id<=40?3:4;
+  const G=Math.max(1,Math.round(P*0.78));
+  const gSet=new Set();
+  while(gSet.size<G)gSet.add(1+Math.floor(rng()*(P-1)));
+  const bossV=Math.round((4+G*gainV)*Math.min(1,0.8+id*0.0045));
+  const path=[];let arrive=4;
+  for(let i=0;i<=P;i++){
+    const cell=cells[i];
+    if(i===0){path.push({c:cell[0],r:cell[1],t:"start"});continue;}
+    if(i===P){path.push({c:cell[0],r:cell[1],t:"boss",v:bossV});continue;}
+    if(gSet.has(i)){arrive+=gainV;path.push({c:cell[0],r:cell[1],t:"gain"});}
+    else{const v=Math.max(2,Math.round(arrive*(0.5+rng()*0.45)));path.push({c:cell[0],r:cell[1],t:"mob",v:v});}
+  }
+  const bi=BOSS_LV.indexOf(id),isBoss=bi>=0,isFinal=id===50;
+  return {id:id,gen:true,
+    name:isFinal?"年兽·终局":isBoss?("生肖Boss·"+ZOD[bi]):("第 "+id+" 关"),
+    sub:(isBoss||isFinal?"Boss战 · ":"")+P+" 步 · 骰子 ×"+D6,
+    tutorial:false,size:GRID_SIZE,startVal:4,dice:D6,gain:gainV,path:path,
+    meta:{wr:plan.wr,seed:id*7919+13}};
+}
+// ====== 引擎参数 ======
+const GRID_SIZE=9;
+const VISION=6, T=52, TW=48, M=42, TILT=58, ZOOM=1.38;
+// ====== 关卡数据兼容层 ======
+function normalizeLevel(lv){
+  lv.size=lv.size||GRID_SIZE;
+  lv.path=lv.path.map((p,i)=>({
+    id:p.id??i,
+    t:p.t||"normal",
+    next:p.next||(i<lv.path.length-1?[i+1]:[]),
+    ...p
+  }));
+  lv.path.forEach((p)=>{
+    if(p.next) p.next=p.next.map(n=>typeof n==="number"?n:lv.path.findIndex(x=>x.id===n)).filter(n=>n>=0);
+    if(p.branches) p.branches=p.branches.map(n=>typeof n==="number"?n:lv.path.findIndex(x=>x.id===n)).filter(n=>n>=0);
+  });
+  return lv;
+}
+function pathEdges(path){
+  const edges=[];
+  path.forEach((p,i)=>{
+    const next=(p.branches&&p.branches.length?p.branches:p.next&&p.next.length?p.next:(i<path.length-1?[i+1]:[]));
+    next.forEach(j=>{if(path[j])edges.push([i,j]);});
+  });
+  return edges;
+}
+
+// ====== 低多边形素材库(纯 CSS/SVG 几何体,改 class/size 即改造型)======
+const HERO='hero',MOB='mob',BOSS='boss';
+function spriteHTML(kind,size){
+  const s=size*6;
+  return `<div class="poly p-${kind}" style="width:${s}px;height:${s}px"></div>`;
+}
+function iconHTML(kind){
+  if(kind==="coin")return `<span class="ico coin"></span>`;
+  if(kind==="dice")return `<span class="ico dice"></span>`;
+  if(kind==="chest")return `<span class="ico chest"></span>`;
+  if(kind==="branch")return `<span class="branchmark"></span>`;
+  return "";
+}
+function dieHTML(n){return `<span class="ico dice"></span><span class="dn">${n}</span>`;}
+let LEVEL=null,idx,val,diceLeft,movesLeft,moving,status,logs,doneSet,lastIdx,lastR,viewMode,mapMin,branchChoices;
+let unlocked=+(localStorage.getItem("sx_unlocked")||1);
+function saveProg(){localStorage.setItem("sx_unlocked",unlocked);}
+function $(id){return document.getElementById(id);}
+function log(t){logs.push(t);}
+
+
+// ====== 界面导航 ======
+function show(id){document.querySelectorAll(".screen").forEach(s=>s.classList.remove("active"));$(id).classList.add("active");}
+function goMenu(){$("menuHero").innerHTML=spriteHTML(HERO,9);$("menuProg").textContent=`已通关 ${Math.min(unlocked-1,50)} / 50 关`;show("screenMenu");}
+function goLevels(){renderLevels();show("screenLevels");}
+function toggleHowto(){const e=$("howto");e.style.display=e.style.display==="block"?"none":"block";}
+function renderLevels(){
+  let html="";
+  for(let i=1;i<=50;i++){
+    const has=LEVELS.some(l=>l.id===i);
+    const boss=BOSS_LV.includes(i)?" bosslv":"";
+    let cls,sub="";
+    if(i<unlocked){cls="done";sub="✓";}
+    else if(i===unlocked){cls="open";sub=has?"可玩":"AI草稿";}
+    else{cls="locked";}
+    html+=`<button class="lv ${cls}${boss}" onclick="tryLevel(${i})">${i}<small>${sub}</small></button>`;
+  }
+  $("lvgrid").innerHTML=html;
+}
+function tryLevel(i){
+  if(i>unlocked)return;
+  let lv=LEVELS.find(l=>l.id===i);
+  if(!lv){lv=genLevel(i);}
+  startLevel(lv);
+}
+function toast(t){
+  const e=$("toast");e.textContent=t;e.classList.add("show");
+  clearTimeout(e._t);e._t=setTimeout(()=>e.classList.remove("show"),1600);
+}
+function startLevel(lv){
+  LEVEL=normalizeLevel(lv);
+  idx=0;val=lv.startVal;diceLeft=lv.dice;movesLeft=0;moving=false;
+  status="playing";logs=[];doneSet=new Set();branchChoices={};lastIdx=lv.path.findIndex(p=>p.t==="boss");lastR=-90;
+  viewMode="3d";
+  $("scene").style.display="block";$("mapWrap").style.display="none";$("btnMap").textContent="地图";
+  $("gameTitle").textContent=`第 ${lv.id} 关 · ${lv.name}`;
+  log(`${lv.name} · ${lv.sub} · 路径 ${lv.path.length} 格 · 骰子 ×${diceLeft}`);
+
+  show("screenGame");
+  build3();buildMap();sync();
+}
+
+// ====== 3D 场景构建 ======
+function build3(){
+  const cam=$("cam");
+  const pad=T*.55, board=GRID_SIZE*T;
+  const pathKeys=new Set(LEVEL.path.map(p=>p.c+","+p.r));
+  let html=`<div class="ground" style="left:${-TW/2-pad}px;top:${-TW/2-pad}px;width:${board+pad*2}px;height:${board+pad*2}px"></div>`;
+  html+=terrainHTML(pathKeys);
+  html+=connectorSVG(LEVEL.path,T,"path-layer");
+  LEVEL.path.forEach((p,i)=>{
+    html+=`<div class="tile t-${p.t}" id="t${i}" style="left:${p.c*T-TW/2}px;top:${p.r*T-TW/2}px"><div class="tile-shadow"></div><div class="tile-side"></div><div class="tile-top"></div><div class="tile-content"><div class="lab"><span class="v">${labV(p)}</span><span class="q">?</span></div></div></div>`;
+  });
+  html+=`<div class="tok" id="tok"><div class="sh"></div><div class="tokin" id="tokin"><div class="tokval" id="tokval"></div></div></div>`;
+  cam.innerHTML=html;
+}
+function terrainHTML(pathKeys){
+  let html="";
+  for(let r=0;r<GRID_SIZE;r++)for(let c=0;c<GRID_SIZE;c++){
+    html+=`<div class="terrain-cell ${(c+r)%2?"alt":""}" style="left:${c*T-T/2}px;top:${r*T-T/2}px"></div>`;
+  }
+  for(let r=0;r<GRID_SIZE;r++)for(let c=0;c<GRID_SIZE;c++){
+    if(pathKeys.has(c+","+r))continue;
+    const n=(c*37+r*53+LEVEL.id*11)%17;
+    if(n===0||n===3)html+=decorHTML("tree",c,r,n);
+    else if(n===5||n===8)html+=decorHTML("rock",c,r,n);
+    else if(n===9)html+=decorHTML("flower",c,r,n);
+    else if(n===12)html+=decorHTML("fence",c,r,n);
+  }
+  return html;
+}
+function decorHTML(type,c,r,n){
+  const ox=(n%3-1)*5,oy=((n+1)%3-1)*5;
+  return `<div class="decor ${type}" style="left:${c*T-T/2+8+ox}px;top:${r*T-T/2+5+oy}px"></div>`;
+}
+function labV(p){
+  if(p.t==="boss")return `<div class="bossmark">${spriteHTML(BOSS,5)}<div class="node-text">${p.v}</div></div>`;
+  if(p.t==="mob")return `<div class="enemy">${spriteHTML(MOB,3)}<div class="node-text">${p.v}</div></div>`;
+  if(p.t==="gain")return `<span class="node-text">+${LEVEL.gain}</span>`;
+  if(p.t==="coin")return iconHTML("coin");
+  if(p.t==="dice")return iconHTML("dice");
+  if(p.t==="chest")return iconHTML("chest");
+  if(p.t==="branch")return iconHTML("branch");
+  if(p.t==="start")return `<span class="node-text">起</span>`;
+  return "";
+}
+
+// ====== 镜头:始终朝向前进方向 ======
+function headingR(){
+  const cur=LEVEL.path[idx],nxt=LEVEL.path[peekNextIndex()]||cur;
+  const dx=nxt.c-cur.c,dy=nxt.r-cur.r;
+  if(!dx&&!dy)return lastR;
+  let R=-90-Math.atan2(dy,dx)*180/Math.PI;
+  while(R-lastR>180)R-=360;
+  while(R-lastR<-180)R+=360;
+  lastR=R;return R;
+}
+function camUpdate(){
+  const sc=$("scene"),cam=$("cam");
+  const cx=sc.clientWidth/2,cy=sc.clientHeight/2,HOFF=sc.clientHeight*0.18;
+  const R=headingR(),cur=LEVEL.path[idx];
+  cam.style.transform=`translate(${cx}px,${cy}px) translateY(${HOFF}px) scale(${ZOOM}) rotateX(${TILT}deg) rotateZ(${R}deg) translate(${-cur.c*T}px,${-cur.r*T}px)`;
+  cam.style.setProperty("--nrz",(-R)+"deg");
+}
+
+// ====== 2D 俯视地图 ======
+function buildMap(){
+  const keys={};
+  LEVEL.path.forEach((p,i)=>{keys[p.c+","+p.r]=i;});
+  mapMin={c:0,r:0};
+  const g=$("mapGrid");
+  g.style.width=(GRID_SIZE*M)+"px";g.style.height=(GRID_SIZE*M)+"px";
+  let html=connectorSVG(LEVEL.path,M,"path-layer map-path");
+  for(let r=0;r<GRID_SIZE;r++)for(let c=0;c<GRID_SIZE;c++){
+    const k=c+","+r,L=c*M,Ty=r*M;
+    if(keys[k]===undefined)
+      html+=`<div class="mcell w" style="left:${L}px;top:${Ty}px;width:${M}px;height:${M}px"></div>`;
+    else{
+      const i=keys[k],p=LEVEL.path[i];
+      html+=`<div class="mcell ${p.t}" id="m${i}" style="left:${L}px;top:${Ty}px;width:${M}px;height:${M}px">${mLab(p)}</div>`;
+    }
+  }
+  html+=`<div id="p2"></div>`;
+  g.innerHTML=html;
+}
+function mLab(p){
+  if(p.t==="boss")return p.v;
+  if(p.t==="mob")return p.v;
+  if(p.t==="gain")return "+"+LEVEL.gain;
+  if(p.t==="coin")return "¤";
+  if(p.t==="dice")return "□";
+  if(p.t==="chest")return "▰";
+  if(p.t==="branch")return "◇";
+  return "起";
+}
+function connectorSVG(path,unit,cls){
+  const size=GRID_SIZE*unit, edges=pathEdges(path);
+  const d=edges.map(([a,b])=>`M ${path[a].c*unit+unit/2} ${path[a].r*unit+unit/2} L ${path[b].c*unit+unit/2} ${path[b].r*unit+unit/2}`).join(" ");
+  return `<svg class="${cls}" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}"><path d="${d}"></path><path class="glow" d="${d}"></path></svg>`;
+}
+
+// ====== 状态同步(3D + 2D + UI + 结算弹窗)======
+function sync(){
+
+  $("statDice").textContent=diceLeft;
+
+  $("statDist").textContent=shortestBossDistance(idx);
+  $("btnRoll").disabled=moving||diceLeft<=0||status!=="playing";
+  camUpdate();
+  const cur=LEVEL.path[idx];
+  LEVEL.path.forEach((p,i)=>{
+    const el=$("t"+i);
+    if(el){el.classList.toggle("done",doneSet.has(i));el.classList.toggle("dim",shortestNodeDistance(idx,i)>VISION&&p.t!=="boss");}
+    const mel=$("m"+i);if(mel)mel.classList.toggle("done",doneSet.has(i));
+  });
+  const tok=$("tok");tok.style.left=(cur.c*T-21)+"px";tok.style.top=(cur.r*T-27)+"px";
+  $("tokval").textContent=val;
+  const p2=$("p2");
+  p2.style.left=((cur.c-mapMin.c)*M+M/2-8)+"px";p2.style.top=((cur.r-mapMin.r)*M+M/2-8)+"px";
+  p2.textContent=val;
+
+
+  const mo=$("modal");
+  if(status==="playing"){mo.classList.remove("show");return;}
+  const box=$("mbox");
+  const next=LEVEL.id<50;
+  if(status==="won"){
+    box.innerHTML=`<h2 style="color:#fbbf24">通关!</h2><p>${logs[logs.length-1]}<br>剩余骰子 ${diceLeft}</p>`
+      +(next?`<button class="pri" onclick="tryLevel(${LEVEL.id+1})">下一关 ›</button>`:`<button class="pri" onclick="goLevels()">返回选关</button>`)
+      +`<button onclick="startLevel(LEVEL)">再来一局</button>`;
+  }else{
+    box.innerHTML=`<h2 style="color:#ef4444">失败</h2><p>${logs[logs.length-1]}</p>`
+      +`<button class="pri" onclick="startLevel(LEVEL)">重试</button><button onclick="goLevels()">返回选关</button>`;
+  }
+  mo.classList.add("show");
+}
+
+// ====== 游戏循环 ======
+function roll(){
+  if(status!=="playing"||moving||diceLeft<=0)return;
+  const n=1+Math.floor(Math.random()*6);
+  diceLeft--;movesLeft=n;moving=true;
+  log(`掷出 ${n} 点(剩 ${diceLeft} 骰)`);
+  const d=$("die");
+  d.classList.add("show");
+  let ticks=0;
+  const iv=setInterval(()=>{
+    d.innerHTML=dieHTML(1+Math.floor(Math.random()*6));
+    if(++ticks>=6){
+      clearInterval(iv);
+      d.innerHTML=dieHTML(n);
+      d.classList.add("pop");
+      setTimeout(()=>{d.classList.remove("show","pop");step();},320);
+    }
+  },75);
+  sync();
+}
+function step(){
+  if(status!=="playing")return;
+  if(movesLeft<=0){endTurn();return;}
+  const next=nextIndex();
+  if(next==null)return askBranch();
+  idx=next;movesLeft--;
+  const tok=$("tok");tok.classList.remove("jump");void tok.offsetWidth;tok.classList.add("jump");
+  const p=LEVEL.path[idx];
+  if(p.t==="gain"){
+    val+=LEVEL.gain;doneSet.add(idx);float3(idx,"+"+LEVEL.gain);
+  }else if(p.t==="mob"){
+    flash3(idx);
+    if(val>=p.v){doneSet.add(idx);log(`数值门 ${p.v}:${val} ≥ ${p.v},通过`);}
+    else{sync();return endGame(false,`被 ${p.v} 小怪挡住——你的数值只有 ${val}`);}
+  }else if(p.t==="boss"){
+    movesLeft=0;moving=false;
+    if(val>=p.v){sync();return endGame(true,`数值 ${val} ≥ Boss ${p.v},通关!`);}
+    sync();return endGame(false,`Boss 需要 ${p.v},你只有 ${val}`);
+  }
+  sync();
+  if(movesLeft>0)setTimeout(step,230);
+  else setTimeout(endTurn,230);
+}
+function endTurn(){
+  moving=false;
+  if(status!=="playing")return;
+  if(LEVEL.path[idx].t==="boss")return;
+  const dist=shortestBossDistance(idx);
+  if(diceLeft<=0)return endGame(false,`骰子耗尽,距 Boss 还差 ${dist} 步`);
+  log(`停驻第 ${idx} 格 · 数值 ${val} · 距 Boss ${dist} 步`);
+  sync();
+}
+function endGame(win,reason){
+  status=win?"won":"lost";moving=false;log(reason);
+  if(win&&LEVEL.id===unlocked&&unlocked<50){unlocked++;saveProg();}
+  sync();
+}
+function float3(i,txt){
+  if(viewMode!=="3d")return;
+  const p=LEVEL.path[i],el=document.createElement("div");
+  el.className="f3";
+  el.style.left=(p.c*T-10)+"px";el.style.top=(p.r*T-10)+"px";
+  el.innerHTML=`<span>${txt}</span>`;
+  $("cam").appendChild(el);
+  setTimeout(()=>el.remove(),750);
+}
+function flash3(i){const el=$("t"+i);if(!el)return;el.classList.remove("flash");void el.offsetWidth;el.classList.add("flash");}
+function peekNextIndex(){return nextIndex(true)??idx;}
+function nextIndex(peek=false){
+  const p=LEVEL.path[idx];
+  if(p.branches&&p.branches.length){
+    if(branchChoices[idx]!=null)return branchChoices[idx];
+    return peek?p.branches[0]:null;
+  }
+  return p.next&&p.next.length?p.next[0]:null;
+}
+function askBranch(){
+  moving=true;
+  const p=LEVEL.path[idx],box=$("mbox"),mo=$("modal");
+  const names=["左路","右路"];
+  box.innerHTML=`<h2 style="color:#a78bfa">选择分支</h2><p>这一步会决定接下来的路线，走到汇合点后继续前进。</p>`
+    +p.branches.map((n,i)=>`<button class="${i===0?"pri":""}" onclick="chooseBranch(${idx},${n})">${names[i]||("路线 "+(i+1))} · ${branchSummary(n)}</button>`).join("");
+  mo.classList.add("show");
+}
+function chooseBranch(from,to){
+  branchChoices[from]=to;
+  $("modal").classList.remove("show");
+  step();
+}
+function branchSummary(start){
+  const p=LEVEL.path[start];
+  if(!p)return "";
+  if(p.t==="mob")return `敌人 ${p.v}`;
+  if(p.t==="gain")return `增益 +${LEVEL.gain}`;
+  if(p.t==="chest")return "宝箱";
+  if(p.t==="dice")return "骰子格";
+  if(p.t==="coin")return "金币";
+  return "普通格";
+}
+function shortestBossDistance(from){return shortestNodeDistance(from,lastIdx);}
+function shortestNodeDistance(from,to){
+  if(from===to)return 0;
+  const q=[[from,0]],seen=new Set([from]);
+  while(q.length){
+    const [i,d]=q.shift(),p=LEVEL.path[i];
+    const ns=(p.branches&&p.branches.length?p.branches:p.next)||[];
+    for(const n of ns){
+      if(n===to)return d+1;
+      if(!seen.has(n)){seen.add(n);q.push([n,d+1]);}
+    }
+  }
+  return 99;
+}
+function toggleView(){
+  viewMode=viewMode==="3d"?"map":"3d";
+  $("scene").style.display=viewMode==="3d"?"block":"none";
+  $("mapWrap").style.display=viewMode==="map"?"block":"none";
+  $("btnMap").textContent=viewMode==="3d"?"地图":"3D";
+  if(viewMode==="3d")camUpdate();
+}
+
+goMenu();
+</script>
+</body>
+</html>

@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>十二生肖爬塔｜核心玩法 Demo</title>
+  <style>
+    :root { --bg:#101626; --panel:#182238; --panel2:#202d48; --ink:#f5f7ff; --muted:#a9b6d1; --gold:#ffc75a; --green:#55d79a; --red:#ff727c; --purple:#a990ff; --line:rgba(255,255,255,.13); }
+    * { box-sizing:border-box; }
+    body { margin:0; min-height:100vh; color:var(--ink); background:radial-gradient(circle at 25% 0%,#283d6b 0,transparent 38%),var(--bg); font-family:"Microsoft YaHei",system-ui,sans-serif; }
+    button { font:inherit; }
+    .shell { width:min(100%,760px); margin:auto; padding:18px 14px 30px; }
+    header { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; margin-bottom:14px; }
+    h1 { margin:0; font-size:clamp(22px,5vw,32px); letter-spacing:.04em; }
+    .sub { color:var(--muted); margin:5px 0 0; font-size:14px; }
+    .badge { white-space:nowrap; border:1px solid rgba(255,199,90,.5); color:var(--gold); background:#2c2940; border-radius:999px; padding:8px 11px; font-size:13px; }
+    .topbar { display:grid; grid-template-columns:repeat(3,1fr); gap:9px; margin-bottom:12px; }
+    .stat { background:rgba(24,34,56,.88); border:1px solid var(--line); border-radius:12px; padding:9px 12px; }
+    .stat span { display:block; color:var(--muted); font-size:12px; }
+    .stat strong { font-size:22px; line-height:1.25; }
+    .charm { display:flex; align-items:center; justify-content:space-between; gap:10px; border:1px solid rgba(169,144,255,.45); background:linear-gradient(100deg,#27213d,#1b2945); border-radius:12px; padding:10px 12px; margin-bottom:12px; }
+    .charm b { color:#ddd4ff; } .charm small { color:var(--muted); display:block; margin-top:2px; }
+    .switch { min-width:82px; border:1px solid #8878ce; background:#342c5a; color:white; min-height:42px; border-radius:9px; cursor:pointer; }
+    .switch.on { background:#6f5ccc; border-color:#c4b9ff; }
+    .legend { display:flex; flex-wrap:wrap; gap:7px 13px; color:var(--muted); font-size:12px; padding:4px 2px 10px; }
+    .dot { display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:4px; } .d-enemy{background:var(--red)} .d-step{background:var(--gold)} .d-power{background:var(--green)}
+    #tower { position:relative; height:460px; overflow:hidden; border:1px solid rgba(185,219,255,.28); border-radius:18px; background:linear-gradient(#50b8ea 0%,#76cff4 48%,#d8f2ff 100%); box-shadow:inset 0 -50px 90px rgba(29,91,158,.24); }
+    #tower:before,#tower:after { content:""; position:absolute; width:190px; height:30px; border-radius:50%; background:rgba(255,255,255,.53); filter:blur(2px); } #tower:before{top:84px;left:-38px} #tower:after{top:178px;right:-40px;width:230px}
+    .floor { position:absolute; z-index:2; width:min(72vw,390px); bottom:calc(18px + var(--level) * 67px); left:var(--x); }
+    .floor-label { position:absolute; left:-55px; bottom:4px; width:49px; border:1px solid rgba(95,58,23,.7); border-radius:8px; color:#fff5dd; background:#765024; box-shadow:0 3px 0 #4c3215; display:flex; flex-direction:column; justify-content:center; align-items:center; font-size:10px; line-height:1.25; min-height:48px; }
+    .floor-label strong { color:#fff; font-size:12px; }
+    .choices { position:relative; display:grid; grid-template-columns:repeat(var(--cols),minmax(0,1fr)); gap:4px; padding:9px 7px 17px; background:linear-gradient(135deg,#e6af58,#b86e29 54%,#854617); border:2px solid #8a4b1b; border-radius:8px 8px 4px 4px; box-shadow:0 10px 0 #6c3715, 0 14px 12px rgba(35,75,109,.27); }
+    .choices:after { content:""; position:absolute; z-index:-1; left:8px;right:8px;bottom:-10px;height:16px;background:#804315;clip-path:polygon(0 0,100% 0,91% 100%,9% 100%); }
+    .tile { min-height:60px; color:var(--ink); text-align:center; border:1px solid rgba(85,45,14,.88); border-radius:7px; padding:5px 3px; background:rgba(90,52,21,.28); transition:transform .18s, border-color .18s, background .18s; text-shadow:0 1px 1px rgba(0,0,0,.45); }
+    .tile.enabled { cursor:pointer; } .tile.enabled:hover,.tile.enabled:focus-visible { transform:translateY(-2px); border-color:#e6eaff; background:#293959; outline:none; }
+    .tile.disabled { opacity:.46; } .tile.selected { border-color:var(--green); box-shadow:0 0 0 2px rgba(85,215,154,.18); }
+    .tile .kind { display:block; font-size:12px; color:var(--muted); } .tile .value { display:block; font-weight:800; font-size:20px; margin-top:3px; }
+    .enemy .value { color:#ff9aa1; } .steps .value { color:#ffe09a; } .power .value { color:#8bf0be; } .boss .value { color:#d2c6ff; } .empty .value { color:#dceeff; font-size:13px; margin-top:7px; }
+    .fog { min-height:61px; border:1px dashed rgba(255,255,255,.75); border-radius:8px; color:#eaf6ff; background:rgba(45,100,147,.46); display:flex; align-items:center; justify-content:center; font-size:12px; letter-spacing:.04em; text-align:center; padding:5px; }
+    .floor.current .floor-label { border-color:#ffe28c; color:#fff1bc; box-shadow:0 0 0 2px rgba(255,221,125,.32),0 3px 0 #4c3215; }
+    .hero { position:absolute; z-index:5; width:46px; height:46px; border-radius:50% 50% 42% 42%; left:calc(50% - 23px); bottom:43px; display:flex; align-items:center; justify-content:center; background:linear-gradient(#e8f5ff 0 36%,#2c6cc3 37%); border:3px solid #183b72; color:#17244b; font-size:11px; font-weight:800; box-shadow:0 5px 0 rgba(20,46,89,.55); text-shadow:none; }
+    .hero:after { content:""; position:absolute; width:62px;height:14px;bottom:-12px;border-radius:50%;background:rgba(30,75,126,.25);z-index:-1; }
+    .notice { min-height:46px; margin:13px 0; border-radius:10px; background:#1b2740; border-left:4px solid var(--gold); display:flex; align-items:center; padding:8px 11px; font-size:14px; line-height:1.45; }
+    .notice.fail { border-color:var(--red); } .notice.win { border-color:var(--green); }
+    .actions { display:flex; gap:9px; flex-wrap:wrap; } .action { min-height:44px; padding:0 16px; border-radius:9px; border:1px solid #64759b; background:#273858; color:white; cursor:pointer; } .action.primary { background:#e7b44e; border-color:#ffdc87; color:#252035; font-weight:700; }
+    .levels { display:flex; flex-wrap:wrap; gap:7px; margin-top:16px; align-items:center; } .levels span { color:var(--muted); font-size:13px; margin-right:3px; } .level { min-width:42px; min-height:42px; border-radius:8px; border:1px solid #566888; background:#182238; color:white; cursor:pointer; } .level.active { color:#211b2e; background:var(--gold); border-color:#ffdf93; font-weight:700; }
+    .tip { margin:14px 0 0; color:#8795b0; font-size:12px; line-height:1.55; }
+    @media (max-width:430px) { .shell{padding:14px 10px 25px} #tower{height:430px}.floor{width:72vw;bottom:calc(15px + var(--level) * 62px)}.floor-label{left:-47px;width:42px}.choices{gap:3px;padding:7px 5px 15px}.tile{padding:4px 2px;min-height:58px}.tile .value{font-size:17px}.topbar{gap:6px}.stat{padding:8px}.stat strong{font-size:20px} }
+    @media (prefers-reduced-motion: reduce) { * { transition:none!important; } }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header><div><h1>十二生肖爬塔</h1><p class="sub">核心玩法验证原型 · 选择一条能到顶的路</p></div><div class="badge" id="levelName"></div></header>
+    <section class="topbar" aria-label="当前状态"><div class="stat"><span>战力</span><strong id="power"></strong></div><div class="stat"><span>剩余步数</span><strong id="steps"></strong></div><div class="stat"><span>当前楼层</span><strong id="floorCount"></strong></div></section>
+    <section class="charm"><div><b>狗符咒 · 伙伴助战</b><small>战斗判定时，战力提高 20%</small></div><button class="switch" id="dog" type="button" aria-pressed="false">未携带</button></section>
+    <div class="legend"><span><i class="dot d-enemy"></i>敌人：战胜后吸收数值</span><span><i class="dot d-step"></i>补给：增加步数</span><span><i class="dot d-power"></i>道具：增加战力</span></div>
+    <section id="tower" aria-label="爬塔路径"></section>
+    <div id="notice" class="notice" role="status"></div>
+    <div class="actions"><button class="action primary" id="restart" type="button">重开本关</button></div>
+    <nav class="levels" aria-label="选择关卡"><span>试玩关：</span><div id="levelButtons"></div></nav>
+    <p class="tip">规则：每层任选一格，需先支付该层的上行步数。敌方数值必须低于你的有效战力；战胜后吸收其数值。仅当前层与后两层可见。</p>
+  </main>
+  <script>
+    const levels = [
+      {name:'第 1 关 · 认识选择', power:4, steps:9, floors:[
+        {cost:1, choices:[['enemy',2],['steps',2],['empty',0],['power',1]]}, {cost:2, choices:[['enemy',5],['power',3],['steps',1],['empty',0]]}, {cost:2, choices:[['steps',3],['enemy',7],['power',2],['empty',0]]}, {cost:2, choices:[['boss',12],['power',2],['steps',1],['empty',0]]}
+      ]},
+      {name:'第 2 关 · 补给绕路', power:5, steps:8, floors:[
+        {cost:1, choices:[['enemy',3],['steps',3],['power',2],['empty',0]]}, {cost:3, choices:[['enemy',8],['steps',2],['power',5],['empty',0]]}, {cost:2, choices:[['enemy',6],['power',4],['steps',1],['empty',0]]}, {cost:2, choices:[['boss',9],['steps',4],['power',3],['empty',0]]}
+      ]},
+      {name:'第 3 关 · 先弱后强', power:6, steps:10, floors:[
+        {cost:2, choices:[['enemy',4],['power',1],['steps',2],['empty',0]]}, {cost:2, choices:[['enemy',9],['steps',3],['power',4],['empty',0]]}, {cost:3, choices:[['enemy',13],['steps',4],['power',5],['empty',0]]}, {cost:2, choices:[['boss',26],['power',5],['steps',2],['empty',0]]}
+      ]},
+      {name:'第 4 关 · 信息赌局', power:7, steps:9, floors:[
+        {cost:1, choices:[['enemy',5],['steps',2],['power',3],['empty',0]]}, {cost:3, choices:[['enemy',11],['power',5],['steps',2],['empty',0]]}, {cost:2, choices:[['steps',4],['enemy',15],['power',3],['empty',0]]}, {cost:3, choices:[['enemy',18],['power',6],['steps',2],['empty',0]]}, {cost:2, choices:[['boss',36],['steps',3],['power',4],['empty',0]]}
+      ]},
+      {name:'第 5 关 · 步数紧张', power:8, steps:8, floors:[
+        {cost:2, choices:[['steps',4],['enemy',6],['power',2],['empty',0]]}, {cost:3, choices:[['enemy',12],['power',4],['steps',2],['empty',0]]}, {cost:2, choices:[['steps',3],['enemy',16],['power',5],['empty',0]]}, {cost:3, choices:[['enemy',20],['power',7],['steps',2],['empty',0]]}, {cost:1, choices:[['boss',42],['steps',4],['power',5],['empty',0]]}
+      ]},
+      {name:'第 6 关 · 狗符咒试炼', power:9, steps:10, floors:[
+        {cost:2, choices:[['enemy',8],['steps',3],['power',3],['empty',0]]}, {cost:2, choices:[['enemy',15],['power',5],['steps',2],['empty',0]]}, {cost:3, choices:[['enemy',22],['steps',4],['power',7],['empty',0]]}, {cost:2, choices:[['enemy',29],['power',8],['steps',2],['empty',0]]}, {cost:3, choices:[['boss',58],['steps',4],['power',8],['empty',0]]}
+      ]}
+    ];
+    let levelIndex=0, state, dog=false;
+    const $=id=>document.getElementById(id);
+    function reset(){ const l=levels[levelIndex]; state={power:l.power,steps:l.steps,floor:0,ended:false,chosen:[]}; render(); }
+    function choiceLabel(type, value){ return type==='enemy'?['小怪','战力 '+value]:type==='boss'?['Boss','战力 '+value]:type==='steps'?['骰子补给','步数 +'+value]:type==='empty'?['安全格','无事件']:['数值道具','战力 +'+value]; }
+    function effective(){ return Math.floor(state.power*(dog?1.2:1)); }
+    function render(){
+      const l=levels[levelIndex]; $('levelName').textContent=l.name; $('power').textContent=state.power+(dog?'（有效 '+effective()+'）':''); $('steps').textContent=state.steps; $('floorCount').textContent=state.floor+' / '+l.floors.length;
+      const tower=$('tower'); tower.innerHTML='';
+      const positions=['4%','25%','9%','27%','14%','25%'];
+      l.floors.forEach((f,i)=>{ const row=document.createElement('div'); row.className='floor '+(i===state.floor&&!state.ended?'current':''); row.style.setProperty('--level',i); row.style.setProperty('--x',positions[i%positions.length]);
+        const lab=document.createElement('div'); lab.className='floor-label'; lab.innerHTML='<span>上行 '+f.cost+' 步</span><strong>'+(i===l.floors.length-1?'顶层':'第 '+(i+1)+' 层')+'</strong>'; row.append(lab);
+        if(i>state.floor+2&&!state.ended){ const fog=document.createElement('div'); fog.className='fog'; fog.textContent='危险区域 · 内容未探明'; row.append(fog); }
+        else { const choices=document.createElement('div'); choices.className='choices'; choices.style.setProperty('--cols',f.choices.length); f.choices.forEach((c,j)=>{ const [type,val]=c, [kind,value]=choiceLabel(type,val); const b=document.createElement('button'); const active=i===state.floor&&!state.ended; b.className='tile '+type+(active?' enabled':' disabled')+(state.chosen[i]===j?' selected':''); b.type='button'; b.disabled=!active; b.innerHTML='<span class="kind">'+kind+'</span><span class="value">'+value+'</span>'; b.setAttribute('aria-label',kind+' '+value); b.onclick=()=>select(j); choices.append(b); }); if(i===state.floor&&!state.ended){const hero=document.createElement('div');hero.className='hero';hero.textContent='你 '+state.power;hero.setAttribute('aria-label','玩家，战力 '+state.power);choices.append(hero);} row.append(choices); } tower.append(row); });
+      const n=$('notice'); if(state.ended==='win'){n.className='notice win';n.textContent='通关！你保留 '+state.steps+' 步到达塔顶。换一关，或关掉狗符咒再试一次。';} else if(state.ended==='fail'){n.className='notice fail';n.textContent=state.message;} else { const f=l.floors[state.floor]; n.className='notice'; n.textContent='第 '+(state.floor+1)+' 层：先支付 '+f.cost+' 步，再选择一个格子。当前有效战力 '+effective()+'。'; }
+      $('dog').textContent=dog?'已携带':'未携带'; $('dog').classList.toggle('on',dog); $('dog').setAttribute('aria-pressed',dog); renderLevelButtons();
+    }
+    function select(index){ const f=levels[levelIndex].floors[state.floor], [type,value]=f.choices[index]; if(state.steps<f.cost){state.ended='fail';state.message='步数不足：需要 '+f.cost+' 步才能继续上行。重新规划补给路线吧。';render();return;} state.steps-=f.cost;
+      if((type==='enemy'||type==='boss') && effective()<=value){state.ended='fail';state.message='战力不足：你的有效战力 '+effective()+' 无法战胜 '+value+' 战力的'+(type==='boss'?'Boss':'敌人')+'。';render();return;}
+      state.chosen[state.floor]=index; if(type==='enemy'||type==='boss') state.power+=value; if(type==='steps') state.steps+=value; if(type==='power') state.power+=value; state.floor++;
+      if(type==='boss'){state.ended='win';} else if(state.floor>=levels[levelIndex].floors.length){state.ended='fail';state.message='没有击败 Boss，挑战失败。';} render();
+    }
+    function renderLevelButtons(){ const el=$('levelButtons');el.innerHTML='';levels.forEach((l,i)=>{const b=document.createElement('button');b.className='level '+(i===levelIndex?'active':'');b.textContent=i+1;b.type='button';b.onclick=()=>{levelIndex=i;reset()};el.append(b);}); }
+    $('restart').onclick=reset; $('dog').onclick=()=>{dog=!dog;render()}; reset();
+  </script>
+</body>
+</html>

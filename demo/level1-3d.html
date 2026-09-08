@@ -1,0 +1,315 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>十二生肖 · 第1关(3D跟随 + 2D地图原型)</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{margin:0;font-family:-apple-system,"Segoe UI",system-ui,sans-serif;background:#0b1220;color:#e2e8f0;
+       display:flex;justify-content:center;min-height:100vh;padding:8px 0 16px}
+  #app{width:100%;max-width:460px;padding:8px}
+  h1{font-size:14px;margin:2px 0 6px;text-align:center;color:#64748b;letter-spacing:1px}
+  .stats{display:flex;gap:6px;margin-bottom:6px}
+  .stat{flex:1;background:#1e293b;border-radius:8px;padding:6px 4px;text-align:center}
+  .stat .k{font-size:10px;color:#94a3b8}
+  .stat .v{font-size:18px;font-weight:700}
+  .s-val .v{color:#60a5fa}.s-dice .v{color:#fbbf24}.s-move .v{color:#34d399}.s-dist .v{color:#f472b6}
+  /* ===== 3D 场景 ===== */
+  #scene{position:relative;width:100%;height:430px;margin:0 auto 8px;border-radius:12px;overflow:hidden;
+         background:linear-gradient(#0e1a2e,#060b16);perspective:950px}
+  #cam{position:absolute;left:0;top:0;transform-style:preserve-3d;transition:transform .32s ease;will-change:transform}
+  .ground{position:absolute;background:#0a1322;border:1px solid #16233a;
+          background-image:linear-gradient(#142036 1px,transparent 1px),linear-gradient(90deg,#142036 1px,transparent 1px);
+          background-size:52px 52px;transform:translateZ(-12px)}
+  .tile{position:absolute;width:44px;height:44px;transform-style:preserve-3d}
+  .tile .face{position:absolute;inset:0;border:1px solid #5b6d8c;background:#3d4d68}
+  .tile .base{position:absolute;inset:0;transform:translateZ(-7px);background:#070d18;border:1px solid #142036}
+  .t-gain .face{background:#0f2914;border-color:#15803d}
+  .t-mob .face{background:#3b1418;border-color:#7f1d1d}
+  .t-boss .face{background:#3a2a08;border-color:#f59e0b}
+  .t-start .face{background:#16283f;border-color:#3b82f6}
+  .lab{position:absolute;left:50%;top:50%;white-space:nowrap;font-weight:900;font-size:13px;color:#e2e8f0;
+       text-shadow:0 1px 4px #000;transform:translate(-50%,-50%) rotateZ(var(--nrz,0deg)) rotateX(var(--ntx,-58deg)) translateZ(10px)}
+  .lab small{display:block;font-size:8px;font-weight:700;text-align:center;opacity:.75}
+  .t-gain .lab{color:#86efac}.t-mob .lab{color:#fca5a5}.t-boss .lab{color:#fde68a;font-size:15px}.t-start .lab{color:#93c5fd}
+  .lab .q{display:none;color:#64748b}
+  .tile.dim{opacity:.25}
+  .tile.dim .v{display:none}
+  .tile.dim .q{display:inline}
+  .tile.done .face{opacity:.45}
+  .tile.done .lab{opacity:.5}
+  .tile.flash .face{animation:hit .3s}
+  @keyframes hit{50%{box-shadow:0 0 0 4px #ef4444,0 0 16px #ef4444}}
+  .tok{position:absolute;width:30px;height:30px;transform-style:preserve-3d}
+  .tok .sh{position:absolute;inset:0;border-radius:50%;background:radial-gradient(ellipse,rgba(0,0,0,.55),transparent 70%);transform:translateZ(2px)}
+  .tokin{position:absolute;inset:0;border-radius:50%;background:#3b82f6;border:2px solid #fff;display:flex;align-items:center;justify-content:center;
+         font-size:12px;font-weight:900;color:#fff;box-shadow:0 8px 16px rgba(0,0,0,.45);
+         transform:rotateZ(var(--nrz,0deg)) rotateX(var(--ntx,-58deg)) translateZ(26px)}
+  .f3{position:absolute;transform-style:preserve-3d;pointer-events:none}
+  .f3 span{display:block;font-weight:900;font-size:14px;color:#86efac;text-shadow:0 1px 4px #000;animation:rise3 .7s forwards;
+           transform:rotateZ(var(--nrz,0deg)) rotateX(var(--ntx,-58deg)) translateZ(14px)}
+  @keyframes rise3{to{margin-top:-30px;opacity:0}}
+  .die{position:absolute;top:36%;left:50%;transform:translate(-50%,-50%);font-size:56px;font-weight:900;color:#fbbf24;
+       text-shadow:0 4px 20px #000;z-index:60;display:none;pointer-events:none}
+  .die.show{display:block;animation:pop .4s}
+  @keyframes pop{0%{transform:translate(-50%,-50%) scale(.2);opacity:0}60%{transform:translate(-50%,-50%) scale(1.25)}100%{transform:translate(-50%,-50%) scale(1);opacity:1}}
+  /* ===== 2D 俯视地图 ===== */
+  #mapWrap{display:none;width:fit-content;margin:0 auto 8px;background:#020617;border-radius:12px}
+  #mapGrid{position:relative}
+  .mcell{position:absolute;border:1px solid #2d3e57;display:flex;align-items:center;justify-content:center;
+         font-size:9px;font-weight:700;color:#cbd5e1;text-align:center;line-height:1.05}
+  .mcell.w{background:#10192a;border-color:#1a2740}
+  .mcell.gain{background:#0f2914;color:#86efac;border-color:#15803d}
+  .mcell.mob{background:#3b1418;color:#fca5a5;border-color:#7f1d1d}
+  .mcell.boss{background:#3a2a08;color:#fde68a;border-color:#f59e0b}
+  .mcell.start{background:#16283f;color:#93c5fd;border-color:#3b82f6}
+  .mcell.done{opacity:.35}
+  #p2{position:absolute;width:16px;height:16px;border-radius:50%;background:#3b82f6;border:2px solid #fff;
+      display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:900;z-index:5;
+      transition:left .2s,top .2s}
+  /* ===== 通用控件 ===== */
+  .controls{display:flex;gap:6px;margin-bottom:6px}
+  button{padding:13px 8px;border:0;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;background:#334155;color:#fff}
+  button:disabled{opacity:.35;cursor:not-allowed}
+  #btnRoll{background:#f59e0b;color:#1f1300;flex:2}
+  #btnMap{flex:0 0 26%;background:#1d4ed8}
+  #btnReset{flex:0 0 22%;background:#475569}
+  #log{background:#020617;border-radius:8px;padding:7px;font-size:11px;min-height:72px;font-family:Consolas,monospace;color:#94a3b8}
+  #log div{margin:1px 0}#log div:last-child{color:#e2e8f0}
+  .hint{font-size:11px;color:#64748b;background:#1e293b;border-radius:8px;padding:7px;line-height:1.5}
+  .hint b{color:#94a3b8}
+  #modal{position:fixed;inset:0;background:rgba(0,0,0,.75);display:none;align-items:center;justify-content:center;z-index:99}
+  #modal.show{display:flex}
+  .mbox{background:#1e293b;border-radius:14px;padding:22px;text-align:center;width:82%;max-width:320px}
+  .mbox h2{margin:0 0 8px;font-size:22px}
+  .mbox p{color:#94a3b8;font-size:12px;margin:0 0 14px;line-height:1.6}
+  .mbox button{width:100%;padding:11px}
+</style>
+</head>
+<body>
+<div id="app">
+  <h1>十二生肖 · 第 1 关(3D 跟随 + 2D 地图原型)</h1>
+  <div class="stats">
+    <div class="stat s-val"><div class="k">你的数值</div><div class="v" id="statVal">-</div></div>
+    <div class="stat s-dice"><div class="k">剩余骰子</div><div class="v" id="statDice">-</div></div>
+    <div class="stat s-move"><div class="k">本轮步数</div><div class="v" id="statMoves">-</div></div>
+    <div class="stat s-dist"><div class="k">距 Boss</div><div class="v" id="statDist">-</div></div>
+  </div>
+  <div id="scene"><div id="cam"></div><div class="die" id="die"></div></div>
+  <div id="mapWrap"><div id="mapGrid"></div></div>
+  <div class="controls">
+    <button id="btnRoll" onclick="roll()">掷骰子</button>
+    <button id="btnMap" onclick="toggleView()">🗺 地图</button>
+    <button id="btnReset" onclick="init()">重来</button>
+  </div>
+  <div id="log"></div>
+  <div class="hint">
+    <b>双视角:</b>3D 跟随视角只看得清前方 6 格(更远处显示 ?),点「地图」看完整棋盘。
+    <b>规则:</b>掷骰强制走满;途经绿格 +2;红格数值门(≥ 即过,平局算赢);5 骰内击败 Boss(24)。
+  </div>
+</div>
+<div id="modal"><div class="mbox" id="mbox"></div></div>
+<script>
+// ====== 关卡数据(与 level1.html 相同,AI 批量生成时只改这里)======
+const LEVEL={
+  startVal:4,dice:5,gain:2,
+  path:[
+    {c:0,r:5,t:"start"},
+    {c:1,r:5,t:"gain"},
+    {c:1,r:4,t:"mob",v:6},
+    {c:1,r:3,t:"gain"},
+    {c:1,r:2,t:"gain"},
+    {c:2,r:2,t:"gain"},
+    {c:3,r:2,t:"gain"},
+    {c:4,r:2,t:"gain"},
+    {c:5,r:2,t:"mob",v:16},
+    {c:5,r:3,t:"gain"},
+    {c:5,r:4,t:"gain"},
+    {c:6,r:4,t:"gain"},
+    {c:7,r:4,t:"mob",v:16},
+    {c:8,r:4,t:"gain"},
+    {c:8,r:5,t:"gain"},
+    {c:9,r:5,t:"boss",v:24}
+  ]
+};
+// ====== 视角与镜头参数 ======
+const VISION=6;      // 3D 视野:前方可见格数(0802 视野机制的落地)
+const T=52;          // 格子间距(px)
+const TW=44;         // 格子边长
+const M=30;          // 2D 地图格边长
+const TILT=58;       // 镜头俯角
+const ZOOM=1.06;     // 屏幕缩放
+let idx,val,diceLeft,movesLeft,moving,status,logs,doneSet,lastIdx,lastR,viewMode,mapMin;
+
+function $(id){return document.getElementById(id);}
+function log(t){logs.push(t);}
+
+function init(){
+  idx=0;val=LEVEL.startVal;diceLeft=LEVEL.dice;movesLeft=0;moving=false;
+  status="playing";logs=[];doneSet=new Set();lastIdx=LEVEL.path.length-1;lastR=-90;
+  viewMode="3d";
+  $("scene").style.display="block";$("mapWrap").style.display="none";$("btnMap").textContent="🗺 地图";
+  log(`起点(0,5)→ Boss(9,5),共 ${lastIdx} 步 · 骰子 ×${diceLeft}`);
+  log(`3D 视野:前方 ${VISION} 格,远处为 ? · 地图可看全盘`);
+  build3();buildMap();sync();
+}
+
+function build3(){
+  const cam=$("cam");
+  let minC=1e9,maxC=-1e9,minR=1e9,maxR=-1e9;
+  LEVEL.path.forEach(p=>{minC=Math.min(minC,p.c);maxC=Math.max(maxC,p.c);minR=Math.min(minR,p.r);maxR=Math.max(maxR,p.r);});
+  const G=10;
+  let html=`<div class="ground" style="left:${minC*T-TW/2-G}px;top:${minR*T-TW/2-G}px;width:${(maxC-minC)*T+TW+2*G}px;height:${(maxR-minR)*T+TW+2*G}px"></div>`;
+  LEVEL.path.forEach((p,i)=>{
+    html+=`<div class="tile t-${p.t}" id="t${i}" style="left:${p.c*T-TW/2}px;top:${p.r*T-TW/2}px"><div class="base"></div><div class="face"></div><div class="lab"><span class="v">${labV(p)}</span><span class="q">?</span></div></div>`;
+  });
+  html+=`<div class="tok" id="tok"><div class="sh"></div><div class="tokin" id="tokin">4</div></div>`;
+  cam.innerHTML=html;
+}
+
+function labV(p){
+  if(p.t==="boss")return `${p.v}<small>BOSS</small>`;
+  if(p.t==="mob")return `${p.v}<small>小怪</small>`;
+  if(p.t==="gain")return `+${LEVEL.gain}`;
+  return `<small>起点</small>`;
+}
+
+// ====== 镜头:始终朝向前进方向 ======
+function headingR(){
+  const cur=LEVEL.path[idx],nxt=LEVEL.path[Math.min(idx+1,lastIdx)];
+  const dx=nxt.c-cur.c,dy=nxt.r-cur.r;
+  if(!dx&&!dy)return lastR;
+  let R=-90-Math.atan2(dy,dx)*180/Math.PI;
+  while(R-lastR>180)R-=360;
+  while(R-lastR<-180)R+=360;
+  lastR=R;return R;
+}
+function camUpdate(){
+  const sc=$("scene"),cam=$("cam");
+  const cx=sc.clientWidth/2,cy=sc.clientHeight/2,HOFF=sc.clientHeight*0.26;
+  const R=headingR(),cur=LEVEL.path[idx];
+  cam.style.transform=`translate(${cx}px,${cy}px) translateY(${HOFF}px) scale(${ZOOM}) rotateX(${TILT}deg) rotateZ(${R}deg) translate(${-cur.c*T}px,${-cur.r*T}px)`;
+  cam.style.setProperty("--nrz",(-R)+"deg");
+  cam.style.setProperty("--ntx",(-TILT)+"deg");
+}
+
+// ====== 2D 俯视地图 ======
+function buildMap(){
+  const keys={};
+  let minC=1e9,maxC=-1e9,minR=1e9,maxR=-1e9;
+  LEVEL.path.forEach((p,i)=>{keys[p.c+","+p.r]=i;minC=Math.min(minC,p.c);maxC=Math.max(maxC,p.c);minR=Math.min(minR,p.r);maxR=Math.max(maxR,p.r);});
+  mapMin={c:minC,r:minR};
+  const g=$("mapGrid");
+  g.style.width=((maxC-minC+1)*M)+"px";g.style.height=((maxR-minR+1)*M)+"px";
+  let html="";
+  for(let r=minR;r<=maxR;r++)for(let c=minC;c<=maxC;c++){
+    const k=c+","+r,L=(c-minC)*M,Ty=(r-minR)*M;
+    if(keys[k]===undefined)
+      html+=`<div class="mcell w" style="left:${L}px;top:${Ty}px;width:${M}px;height:${M}px"></div>`;
+    else{
+      const i=keys[k],p=LEVEL.path[i];
+      html+=`<div class="mcell ${p.t}" id="m${i}" style="left:${L}px;top:${Ty}px;width:${M}px;height:${M}px">${mLab(p)}</div>`;
+    }
+  }
+  html+=`<div id="p2"></div>`;
+  g.innerHTML=html;
+}
+function mLab(p){
+  if(p.t==="boss")return p.v;
+  if(p.t==="mob")return p.v;
+  if(p.t==="gain")return "+"+LEVEL.gain;
+  return "起";
+}
+
+// ====== 状态同步(3D + 2D + UI)======
+function sync(){
+  $("statVal").textContent=val;
+  $("statDice").textContent=diceLeft;
+  $("statMoves").textContent=moving?movesLeft:"-";
+  $("statDist").textContent=Math.max(0,lastIdx-idx);
+  $("btnRoll").disabled=moving||diceLeft<=0||status!=="playing";
+  camUpdate();
+  const cur=LEVEL.path[idx];
+  LEVEL.path.forEach((p,i)=>{
+    const el=$("t"+i);
+    if(el){el.classList.toggle("done",doneSet.has(i));el.classList.toggle("dim",i>idx+VISION&&p.t!=="boss");}
+    const mel=$("m"+i);if(mel)mel.classList.toggle("done",doneSet.has(i));
+  });
+  const tok=$("tok");tok.style.left=(cur.c*T-15)+"px";tok.style.top=(cur.r*T-15)+"px";
+  $("tokin").textContent=val;
+  const p2=$("p2");
+  p2.style.left=((cur.c-mapMin.c)*M+M/2-8)+"px";p2.style.top=((cur.r-mapMin.r)*M+M/2-8)+"px";
+  p2.textContent=val;
+  $("log").innerHTML=logs.slice(-6).map(l=>`<div>${l}</div>`).join("");
+  const mo=$("modal");
+  if(status==="playing"){mo.classList.remove("show");return;}
+  const box=$("mbox");
+  if(status==="won")
+    box.innerHTML=`<h2 style="color:#fbbf24">通关!</h2><p>${logs[logs.length-1]}<br>剩余骰子 ${diceLeft}</p><button onclick="init()">再来一局</button>`;
+  else
+    box.innerHTML=`<h2 style="color:#ef4444">失败</h2><p>${logs[logs.length-1]}<br>提示:5 颗骰子期望约 17.5 步,通关概率约 78%</p><button onclick="init()">重试</button>`;
+  mo.classList.add("show");
+}
+
+// ====== 游戏循环(规则与 level1.html 一致)======
+function roll(){
+  if(status!=="playing"||moving||diceLeft<=0)return;
+  const n=1+Math.floor(Math.random()*6);
+  diceLeft--;movesLeft=n;moving=true;
+  log(`掷出 ${n} 点(剩 ${diceLeft} 骰)`);
+  const d=$("die");d.textContent="🎲 "+n;d.classList.remove("show");void d.offsetWidth;d.classList.add("show");
+  sync();
+  setTimeout(()=>{d.classList.remove("show");step();},420);
+}
+function step(){
+  if(status!=="playing")return;
+  if(movesLeft<=0){endTurn();return;}
+  idx++;movesLeft--;
+  const p=LEVEL.path[idx];
+  if(p.t==="gain"){
+    val+=LEVEL.gain;doneSet.add(idx);float3(idx,"+"+LEVEL.gain);
+  }else if(p.t==="mob"){
+    flash3(idx);
+    if(val>=p.v){doneSet.add(idx);log(`数值门 ${p.v}:${val} ≥ ${p.v},通过`);}
+    else{sync();return endGame(false,`被 ${p.v} 小怪挡住——你的数值只有 ${val}`);}
+  }else if(p.t==="boss"){
+    movesLeft=0;moving=false;
+    if(val>=p.v){sync();return endGame(true,`数值 ${val} ≥ Boss ${p.v},通关!`);}
+    sync();return endGame(false,`Boss 需要 ${p.v},你只有 ${val}`);
+  }
+  sync();
+  if(movesLeft>0)setTimeout(step,230);
+  else setTimeout(endTurn,230);
+}
+function endTurn(){
+  moving=false;
+  if(status!=="playing")return;
+  if(idx>=lastIdx)return;
+  if(diceLeft<=0)return endGame(false,`骰子耗尽,距 Boss 还差 ${lastIdx-idx} 步`);
+  log(`停驻第 ${idx} 格 · 数值 ${val} · 距 Boss ${lastIdx-idx} 步`);
+  sync();
+}
+function endGame(win,reason){status=win?"won":"lost";moving=false;log(reason);sync();}
+function float3(i,txt){
+  if(viewMode!=="3d")return;
+  const p=LEVEL.path[i],el=document.createElement("div");
+  el.className="f3";
+  el.style.left=(p.c*T-10)+"px";el.style.top=(p.r*T-10)+"px";
+  el.innerHTML=`<span>${txt}</span>`;
+  $("cam").appendChild(el);
+  setTimeout(()=>el.remove(),750);
+}
+function flash3(i){const el=$("t"+i);if(!el)return;el.classList.remove("flash");void el.offsetWidth;el.classList.add("flash");}
+function toggleView(){
+  viewMode=viewMode==="3d"?"map":"3d";
+  $("scene").style.display=viewMode==="3d"?"block":"none";
+  $("mapWrap").style.display=viewMode==="map"?"block":"none";
+  $("btnMap").textContent=viewMode==="3d"?"🗺 地图":"🎥 3D";
+  if(viewMode==="3d")camUpdate();
+}
+
+init();
+</script>
+</body>
+</html>

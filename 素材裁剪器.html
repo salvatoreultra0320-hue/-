@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>美术裁剪器 · 十二生肖闯关</title>
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,"PingFang SC","Microsoft YaHei",system-ui,sans-serif;background:#0a0920;color:#e2e8f0;padding:12px;min-height:100vh}
+  #app{display:flex;gap:12px;max-width:1320px;margin:0 auto;align-items:flex-start}
+  .side{width:270px;flex-shrink:0;display:flex;flex-direction:column;gap:10px}
+  .panel{background:linear-gradient(180deg,#1a1638,#0c0a24);border:2px solid #2c2448;border-radius:10px;padding:12px}
+  .panel h3{margin:0 0 10px;font-size:12px;color:#fbbf24;font-weight:800;letter-spacing:1px;border-bottom:1px solid #2c2448;padding-bottom:7px}
+  .btn{display:block;width:100%;padding:9px 12px;border:2px solid #2c2448;border-radius:8px;background:#221b40;color:#cfc9f0;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;margin-bottom:6px;text-align:left}
+  .btn:hover{background:#2e2550}
+  .btn.primary{background:linear-gradient(180deg,#ffd23f,#f5a623);color:#1a1530;border-color:#5e3b00}
+  .btn.success{background:linear-gradient(180deg,#3fb56b,#2a8049);color:#fff;border-color:#1d5e3a}
+  .btn.danger{background:linear-gradient(180deg,#d44058,#8a1f33);color:#fff;border-color:#5e1018}
+  .btn:disabled{opacity:.4;cursor:not-allowed}
+  .hint{font-size:11px;color:#8d84b8;line-height:1.6;padding:7px 9px;background:#0f0b20;border-radius:6px;border-left:3px solid #2c2448}
+  .hint b{color:#c4b5fd}
+  .steps{font-size:11px;color:#cfc9f0;line-height:1.8;padding:8px 10px;background:#0f0b20;border-radius:6px}
+  .steps i{color:#52f09a;font-style:normal;font-weight:900}
+  #cropList{max-height:420px;overflow-y:auto;display:flex;flex-direction:column;gap:6px}
+  .crop-item{border:2px solid #2c2448;border-radius:7px;padding:7px;background:#17122e}
+  .crop-item .ci-top{display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:5px}
+  .crop-item .ci-label{font-size:12px;font-weight:900;color:#ffd257}
+  .crop-item input{width:100%;background:#0f0b20;border:2px solid #2c2448;color:#e2e8f0;padding:6px 8px;border-radius:5px;font-size:12px;font-family:inherit}
+  .crop-item input:focus{outline:none;border-color:#7c5cff}
+  .crop-item .xbtn{cursor:pointer;color:#d44058;font-weight:900;font-size:14px;padding:0 5px;border:1px solid #5e1018;border-radius:4px;background:#2a0a12;flex-shrink:0}
+  .main{flex:1;min-width:0}
+  #canvasWrap{overflow:auto;max-height:74vh;background:#0f0b20;border:2px dashed #2c2448;border-radius:8px;display:flex;padding:10px}
+  #cv{cursor:crosshair;image-rendering:pixelated;margin:auto;flex:0 0 auto}
+  #emptyMsg{padding:50px;color:#5b537a;font-size:14px;text-align:center;margin:auto}
+  #dirStatus{font-size:11px;color:#9fe0bd;margin-top:6px}
+  .toast{position:fixed;left:50%;bottom:30px;transform:translateX(-50%);background:#221b40;border:2px solid #7c5cff;color:#fff;padding:8px 16px;border-radius:20px;font-size:13px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:99}
+  .toast.show{opacity:1}
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="side">
+    <div class="panel">
+      <h3>使用步骤</h3>
+      <div class="steps">
+        <i>1</i> 上传透明底 PNG<br>
+        <i>2</i> 拖拽框选各素材<br>
+        <i>3</i> 给每块<b>命名</b>（如 tiles/mob）<br>
+        <i>4</i> 选择 images/ 目录<br>
+        <i>5</i> 导出——同名 .svg 自动覆盖
+      </div>
+    </div>
+    <div class="panel">
+      <h3>工具</h3>
+      <button class="btn primary" onclick="document.getElementById('fileInput').click()">📁 上传透明底 PNG</button>
+      <button class="btn" id="btnDir" onclick="pickDir()">📂 选择 images/ 目录</button>
+      <button class="btn success" id="btnExport" onclick="exportAll()">⬆ 导出命名 .svg（同名覆盖）</button>
+      <button class="btn danger" onclick="clearAll()">🗑 清空</button>
+    </div>
+    <div class="panel">
+      <h3>SVG 贴图去留白</h3>
+      <div class="hint">载入内嵌 PNG 的 .svg，<b>自动裁掉透明边缘</b>并铺满画布，修复「贴图不贴边」。只用于<b>平铺纹理</b>（normal/trap/coin 等），勿用于站立立绘。</div>
+      <button class="btn primary" onclick="document.getElementById('svgInput').click()">📁 载入 SVG</button>
+      <input type="text" id="svgName" list="targetPresets" placeholder="输出名，如 themes/set2/tiles/normal" style="width:100%;background:#0f0b20;border:2px solid #2c2448;color:#e2e8f0;padding:6px 8px;border-radius:5px;font-size:12px;font-family:inherit;margin-bottom:6px">
+      <button class="btn success" id="btnSvgExport" onclick="exportSvgFixed()" disabled>⬆ 导出修正 .svg（写 images/）</button>
+      <button class="btn" id="btnSvgDl" onclick="downloadSvgFixed()" disabled>⬇ 下载修正 .svg</button>
+      <div id="svgStatus" style="font-size:11px;color:#9fe0bd;margin-top:6px;line-height:1.6"></div>
+      <div id="svgPrev" style="display:none;margin-top:8px">
+        <div style="font-size:10px;color:#9fe0bd;margin-bottom:4px">原始 → 修正（灰白棋盘=透明区）</div>
+        <div style="display:flex;gap:6px">
+          <img id="svgPrevA" alt="" style="width:96px;height:96px;object-fit:contain;background:repeating-conic-gradient(#3a3a44 0 25%,#23232b 0 50%) 0 0/14px 14px;border:1px solid #2c2448;border-radius:4px">
+          <img id="svgPrevB" alt="" style="width:96px;height:96px;object-fit:contain;background:repeating-conic-gradient(#3a3a44 0 25%,#23232b 0 50%) 0 0/14px 14px;border:1px solid #3fb56b;border-radius:4px">
+        </div>
+      </div>
+    </div>
+    <div class="panel">
+      <h3>裁剪块 <span id="cropCount">0</span></h3>
+      <div id="cropList"><div class="hint">暂无——在图上拖拽框选</div></div>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="panel">
+      <h3>画布（拖拽框选裁剪 · 灰白棋盘格=透明区）</h3>
+      <div id="canvasWrap">
+        <div id="emptyMsg">请先上传一张透明底 PNG 图片</div>
+        <canvas id="cv" style="display:none"></canvas>
+      </div>
+      <div id="dirStatus"></div>
+    </div>
+  </div>
+</div>
+
+<input type="file" id="fileInput" accept="image/png" hidden>
+<input type="file" id="svgInput" accept=".svg,image/svg+xml" hidden>
+<datalist id="targetPresets"></datalist>
+<div class="toast" id="toast"></div>
+
+<script>
+// ===== 目标命名预设（images/ 下的同名 .svg，可自由输入其它名字）=====
+const TARGETS=[
+  'tiles/start','tiles/normal','tiles/gain','tiles/trap','tiles/portal','tiles/chest','tiles/mob',
+  'tiles/elite','tiles/boss','tiles/coin','tiles/dice','tiles/branch',
+  'weapons/blade','weapons/scythe','weapons/dagger','weapons/lucky','weapons/twin','weapons/cursed',
+  'charms/dog','charms/rat','charms/ox',
+  'bosses/boss_dog','bosses/boss_rat','bosses/boss_ox','bosses/boss_tiger','bosses/boss_rabbit','bosses/boss_dragon','bosses/boss_snake',
+  'bosses/boss_horse','bosses/boss_goat','bosses/boss_monkey','bosses/boss_rooster','bosses/boss_pig',
+  'board','sky',
+  'themes/set1/tiles/normal','themes/set2/tiles/normal','themes/set3/tiles/normal','themes/set4/tiles/normal','themes/set5/tiles/normal',
+  'themes/set1/tiles/trap','themes/set1/tiles/coin','themes/set1/tiles/start','themes/set1/tiles/cloud'
+];
+document.getElementById('targetPresets').innerHTML=TARGETS.map(t=>`<option value="${t}">`).join('');
+
+let img=null, crops=[], dirHandle=null, dragging=null, base=null;
+const cv=document.getElementById('cv');
+const ctx=cv.getContext('2d');
+
+function toast(t){const e=document.getElementById('toast');e.textContent=t;e.classList.add('show');clearTimeout(e._t);e._t=setTimeout(()=>e.classList.remove('show'),1600);}
+
+// ===== 上传 =====
+document.getElementById('fileInput').addEventListener('change',e=>{
+  const f=e.target.files[0];if(!f)return;
+  const im=new Image();
+  im.onload=()=>{img=im;crops=[];document.getElementById('emptyMsg').style.display='none';cv.style.display='block';setupCanvas();renderList();toast('已加载 '+f.name+'（'+im.naturalWidth+'×'+im.naturalHeight+'）');};
+  im.src=URL.createObjectURL(f);
+});
+
+function setupCanvas(){
+  cv.width=img.naturalWidth; cv.height=img.naturalHeight;
+  // 合成基础层(棋盘格 + 图片),后续只画 crops 提升性能
+  base=document.createElement('canvas');base.width=cv.width;base.height=cv.height;
+  const bctx=base.getContext('2d');
+  const s=14;
+  for(let y=0;y<cv.height;y+=s)for(let x=0;x<cv.width;x+=s){
+    bctx.fillStyle=((x/s+y/s)%2===0)?'#3a3a44':'#23232b';
+    bctx.fillRect(x,y,s,s);
+  }
+  bctx.drawImage(img,0,0);
+  // 按可用空间缩放显示(整体可见,不裁剪)
+  const wrap=document.getElementById('canvasWrap');
+  const availW=Math.max(320,wrap.clientWidth-24);
+  const availH=Math.max(280,wrap.clientHeight-20);
+  const sc=Math.min(1, availW/img.naturalWidth, availH/img.naturalHeight);
+  cv.style.width=Math.max(1,Math.round(img.naturalWidth*sc))+'px';
+  cv.style.height=Math.max(1,Math.round(img.naturalHeight*sc))+'px';
+  redraw();
+}
+
+function toImgCoords(e){
+  const r=cv.getBoundingClientRect();
+  return {x:(e.clientX-r.left)/r.width*cv.width, y:(e.clientY-r.top)/r.height*cv.height};
+}
+cv.addEventListener('mousedown',e=>{if(!img)return;dragging=toImgCoords(e);});
+window.addEventListener('mousemove',e=>{if(!dragging)return;const p=toImgCoords(e);dragging.x1=p.x;dragging.y1=p.y;redraw();});
+window.addEventListener('mouseup',()=>{
+  if(!dragging)return;
+  const x=Math.round(Math.min(dragging.x,dragging.x1)), y=Math.round(Math.min(dragging.y,dragging.y1));
+  const w=Math.round(Math.abs(dragging.x1-dragging.x)), h=Math.round(Math.abs(dragging.y1-dragging.y));
+  dragging=null;
+  if(w<4||h<4){redraw();return;}
+  crops.push({x,y,w,h,name:''});
+  redraw();renderList();
+});
+
+function redraw(){
+  if(!img)return;
+  ctx.clearRect(0,0,cv.width,cv.height);
+  if(base)ctx.drawImage(base,0,0);
+  crops.forEach((c,i)=>{
+    ctx.strokeStyle='#3fb56b';ctx.lineWidth=2;ctx.strokeRect(c.x,c.y,c.w,c.h);
+    ctx.fillStyle='rgba(63,181,107,.92)';ctx.fillRect(c.x,c.y,28,16);
+    ctx.fillStyle='#04250f';ctx.font='bold 11px sans-serif';ctx.fillText('#'+(i+1),c.x+3,c.y+12);
+  });
+  if(dragging){
+    const x=Math.min(dragging.x,dragging.x1),y=Math.min(dragging.y,dragging.y1),w=Math.abs(dragging.x1-dragging.x),h=Math.abs(dragging.y1-dragging.y);
+    ctx.strokeStyle='#ffd257';ctx.lineWidth=2;ctx.setLineDash([5,3]);ctx.strokeRect(x,y,w,h);ctx.setLineDash([]);
+  }
+}
+
+// ===== 列表 =====
+function renderList(){
+  document.getElementById('cropCount').textContent=crops.length;
+  const box=document.getElementById('cropList');
+  if(!crops.length){box.innerHTML='<div class="hint">暂无——在图上拖拽框选</div>';return;}
+  box.innerHTML=crops.map((c,i)=>`
+    <div class="crop-item">
+      <div class="ci-top"><span class="ci-label">#${i+1} · ${c.w}×${c.h}</span><span class="xbtn" onclick="removeCrop(${i})">✕</span></div>
+      <input type="text" list="targetPresets" placeholder="命名，如 tiles/mob" value="${c.name}" oninput="setName(${i},this.value)">
+    </div>`).join('');
+}
+function setName(i,v){crops[i].name=v.trim();}
+function removeCrop(i){crops.splice(i,1);redraw();renderList();}
+function clearAll(){crops=[];img=null;base=null;cv.style.display='none';document.getElementById('emptyMsg').style.display='block';renderList();}
+
+// ===== 裁剪 → SVG =====
+function cropToSVG(c){
+  const tmp=document.createElement('canvas');tmp.width=c.w;tmp.height=c.h;
+  const tctx=tmp.getContext('2d');
+  tctx.drawImage(img,c.x,c.y,c.w,c.h,0,0,c.w,c.h);
+  const data=tmp.toDataURL('image/png');
+  return `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${c.w}" height="${c.h}" viewBox="0 0 ${c.w} ${c.h}"><image x="0" y="0" width="${c.w}" height="${c.h}" xlink:href="${data}"/></svg>`;
+}
+function normName(n){
+  n=(n||'').trim().replace(/^\/+/,'').replace(/\.svg$/i,'');
+  return n||null;
+}
+
+// ===== 写回 =====
+async function pickDir(){
+  if(!window.showDirectoryPicker){toast('当前浏览器不支持目录写入（需 Chrome/Edge）');return;}
+  try{dirHandle=await window.showDirectoryPicker({mode:'readwrite'});document.getElementById('dirStatus').textContent='已选择：'+dirHandle.name;toast('已选择目录 '+dirHandle.name+'（请选 images/ 文件夹）');}
+  catch(e){if(e.name!=='AbortError')toast('选择目录失败：'+e.message);}
+}
+async function exportAll(){
+  if(!img||!crops.length){toast('请先上传图片并裁剪');return;}
+  const unnamed=crops.filter(c=>!normName(c.name)).length;
+  if(unnamed){toast('还有 '+unnamed+' 块未命名');return;}
+  if(!dirHandle){toast('请先「选择 images/ 目录」');return;}
+  let done=0,failed=[];
+  for(const c of crops){
+    try{
+      const svg=cropToSVG(c);
+      const parts=normName(c.name).split('/');
+      let dh=dirHandle;
+      for(let i=0;i<parts.length-1;i++)dh=await dh.getDirectoryHandle(parts[i],{create:true});
+      const fh=await dh.getFileHandle(parts[parts.length-1]+'.svg',{create:true});
+      const w=await fh.createWritable();await w.write(svg);await w.close();
+      done++;
+    }catch(e){failed.push(c.name+'('+e.message+')');}
+  }
+  toast('已导出 '+done+' 个 .svg（同名已覆盖）'+(failed.length?'；失败 '+failed.length+'：'+failed.join(';'):''));
+}
+
+// ===== SVG 贴图去留白（自动裁透明边缘 + 画布铺满，纯浏览器 PNG 编解码）=====
+async function inflateBytes(b){const s=new Response(b).body.pipeThrough(new DecompressionStream('deflate'));return new Uint8Array(await new Response(s).arrayBuffer());}
+async function deflateBytes(b){const s=new Blob([b]).stream().pipeThrough(new CompressionStream('deflate'));return new Uint8Array(await new Response(s).arrayBuffer());}
+function bytesToBase64(b){let x='';for(let i=0;i<b.length;i++)x+=String.fromCharCode(b[i]);return btoa(x);}
+function crc32(b){let c,t=[];for(let n=0;n<256;n++){c=n;for(let k=0;k<8;k++)c=c&1?0xedb88320^(c>>>1):c>>>1;t[n]=c;}let crc=0xffffffff;for(const v of b)crc=t[(crc^v)&255]^(crc>>>8);return (crc^0xffffffff)>>>0;}
+async function decodePng(buf){
+  if(buf[0]!==137||buf[1]!==80)throw new Error('不是 PNG 文件');
+  const dv=o=>new DataView(buf.buffer,buf.byteOffset+o);
+  const w=dv(16).getUint32(0),h=dv(16).getUint32(4),ct=buf[25];
+  const ch=ct===6?4:(ct===2?3:(ct===0?1:0));
+  if(!ch)throw new Error('不支持的 PNG 色彩类型 '+ct);
+  let idat=[],off=8;
+  while(off<buf.length){
+    const len=dv(off).getUint32(0),type=String.fromCharCode(buf[off+4],buf[off+5],buf[off+6],buf[off+7]);
+    if(type==='IDAT')idat.push(buf.slice(off+8,off+8+len));
+    off+=12+len;
+  }
+  let cat=new Uint8Array(0);
+  for(const c of idat){const n=new Uint8Array(cat.length+c.length);n.set(cat);n.set(c,cat.length);cat=n;}
+  const raw=await inflateBytes(cat);
+  const stride=w*ch,row=1+stride;
+  const px=new Uint8Array(h*stride);
+  for(let y=0;y<h;y++){
+    const f=raw[y*row],base=y*stride;
+    for(let x=0;x<stride;x++){
+      let v=raw[y*row+1+x];
+      const a=x>=ch?px[base+x-ch]:0,b=y>0?px[base-stride+x]:0,c=x>=ch&&y>0?px[base-stride+x-ch]:0;
+      if(f===1)v=(v+a)&255;else if(f===2)v=(v+b)&255;else if(f===3)v=(v+((a+b)>>1))&255;
+      else if(f===4){const p=a+c-b,pa=Math.abs(p-a),pb=Math.abs(p-b),pc=Math.abs(p-c);const pr=pa<=pb&&pa<=pc?a:pb<=pc?b:c;v=(v+pr)&255;}
+      px[base+x]=v;
+    }
+  }
+  return {w,h,ch,px,hasAlpha:ct===6||ct===0};
+}
+async function makePng(rgba,w,h){
+  const sig=new Uint8Array([137,80,78,71,13,10,26,10]);
+  const ihdr=new Uint8Array(13);new DataView(ihdr.buffer).setUint32(0,w);new DataView(ihdr.buffer).setUint32(4,h);ihdr[8]=8;ihdr[9]=6;
+  const chunk=(type,data)=>{const t=new TextEncoder().encode(type),len=new Uint8Array(4);new DataView(len.buffer).setUint32(0,data.length);const body=new Uint8Array(t.length+data.length);body.set(t);body.set(data,t.length);const crc=new Uint8Array(4);new DataView(crc.buffer).setUint32(0,crc32(body));const out=new Uint8Array(8+data.length+4);out.set(len);out.set(body,4);out.set(crc,4+body.length);return out;};
+  const scan=new Uint8Array(h*(1+w*4));
+  for(let y=0;y<h;y++){scan[y*(1+w*4)]=0;scan.set(rgba.subarray(y*w*4,(y+1)*w*4),y*(1+w*4)+1);}
+  const ihdrC=chunk('IHDR',ihdr),idatC=chunk('IDAT',new Uint8Array(await deflateBytes(scan))),iendC=chunk('IEND',new Uint8Array(0));
+  const all=new Uint8Array(sig.length+ihdrC.length+idatC.length+iendC.length);
+  all.set(sig);all.set(ihdrC,sig.length);all.set(idatC,sig.length+ihdrC.length);all.set(iendC,sig.length+ihdrC.length+idatC.length);
+  return all;
+}
+let svgFixed=null;
+document.getElementById('svgInput').addEventListener('change',async e=>{
+  const f=e.target.files[0];if(!f)return;
+  try{
+    const text=await f.text();
+    const b64=text.match(/base64,([A-Za-z0-9+/=]+)/);
+    if(!b64)throw new Error('未找到内嵌 base64 PNG');
+    const bin=atob(b64[1]);const buf=new Uint8Array(bin.length);
+    for(let i=0;i<bin.length;i++)buf[i]=bin.charCodeAt(i);
+    const png=await decodePng(buf);
+    if(!png.hasAlpha)throw new Error('该 PNG 无透明通道，无法自动裁边');
+    const ai=png.ch-1;
+    let minX=png.w,minY=png.h,maxX=-1,maxY=-1;
+    for(let y=0;y<png.h;y++)for(let x=0;x<png.w;x++){
+      if(png.px[y*png.w*png.ch+x*png.ch+ai]>8){
+        if(x<minX)minX=x;if(x>maxX)maxX=x;if(y<minY)minY=y;if(y>maxY)maxY=y;
+      }
+    }
+    if(maxX<0)throw new Error('PNG 全透明');
+    const cw=maxX-minX+1,chh=maxY-minY+1;
+    const crop=new Uint8Array(chh*cw*4);
+    for(let y=0;y<chh;y++)for(let x=0;x<cw;x++){
+      const s=((minY+y)*png.w+(minX+x))*png.ch,d=(y*cw+x)*4;
+      crop[d]=png.px[s];crop[d+1]=png.px[s+1];crop[d+2]=png.px[s+2];crop[d+3]=png.px[s+3];
+    }
+    const newPng=await makePng(crop,cw,chh);
+    svgFixed=`<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${cw}" height="${chh}" viewBox="0 0 ${cw} ${chh}"><image x="0" y="0" width="${cw}" height="${chh}" xlink:href="data:image/png;base64,${bytesToBase64(newPng)}"></image></svg>`;
+    document.getElementById('svgStatus').innerHTML=`${png.w}×${png.h} → 裁留白(${minX},${minY}) → <b>${cw}×${chh}</b>（边距 L${minX} R${png.w-1-maxX} T${minY} B${png.h-1-maxY}）`;
+    document.getElementById('btnSvgExport').disabled=false;
+    document.getElementById('btnSvgDl').disabled=false;
+    const show=(id,svg)=>{const im=document.getElementById(id);im.src=URL.createObjectURL(new Blob([svg],{type:'image/svg+xml'}));};
+    show('svgPrevA',text);show('svgPrevB',svgFixed);
+    document.getElementById('svgPrev').style.display='block';
+    if(!document.getElementById('svgName').value)document.getElementById('svgName').value='themes/set2/tiles/'+(f.name||'').replace(/\.svg$/i,'');
+    toast('SVG 处理完成');
+  }catch(err){document.getElementById('svgStatus').textContent='处理失败：'+err.message;toast('失败：'+err.message);}
+});
+async function exportSvgFixed(){
+  if(!svgFixed)return;
+  const name=normName(document.getElementById('svgName').value);
+  if(!name){toast('请填写输出名（相对 images/）');return;}
+  if(!dirHandle){toast('请先「选择 images/ 目录」');return;}
+  try{
+    const parts=name.split('/');
+    let dh=dirHandle;
+    for(let i=0;i<parts.length-1;i++)dh=await dh.getDirectoryHandle(parts[i],{create:true});
+    const fh=await dh.getFileHandle(parts[parts.length-1]+'.svg',{create:true});
+    const w=await fh.createWritable();await w.write(svgFixed);await w.close();
+    toast('已导出 images/'+name+'.svg');
+  }catch(e){toast('导出失败：'+e.message);}
+}
+function downloadSvgFixed(){
+  if(!svgFixed)return;
+  const name=normName(document.getElementById('svgName').value)||'fixed';
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([svgFixed],{type:'image/svg+xml'}));a.download=name+'.svg';a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+}
+</script>
+</body>
+</html>
